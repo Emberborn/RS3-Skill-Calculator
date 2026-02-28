@@ -1,0 +1,33 @@
+{
+    "skills":  [
+                   "attack.skill",
+                   "constitution.skill",
+                   "mining.skill",
+                   "strength.skill",
+                   "agility.skill",
+                   "smithing.skill",
+                   "defence.skill",
+                   "herblore.skill",
+                   "fishing.skill",
+                   "ranged.skill",
+                   "thieving.skill",
+                   "cooking.skill",
+                   "prayer.skill",
+                   "crafting.skill",
+                   "firemaking.skill",
+                   "magic.skill",
+                   "fletching.skill",
+                   "woodcutting.skill",
+                   "runecrafting.skill",
+                   "slayer.skill",
+                   "farming.skill",
+                   "construction.skill",
+                   "hunter.skill",
+                   "summoning.skill",
+                   "dungeoneering.skill",
+                   "divination.skill",
+                   "invention.skill",
+                   "archaeology.skill",
+                   "necromancy.skill"
+               ]
+}

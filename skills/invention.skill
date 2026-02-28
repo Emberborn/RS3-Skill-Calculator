@@ -1,0 +1,35 @@
+# Skill data format
+# Optional: Curve: standard | invention
+# Method block:
+# Method: <name>
+# Type: <any tab name> (optional, default Default)
+# Level: <required-level> (optional, default 1)
+# XP: <value>
+#
+# Boost block:
+# Boost: <name>
+# Type: <any group name> (optional, default General)
+# XP-Percent: <percent> (optional, at least one XP field required)
+# XP-Multiplier: <multiplier> (optional, at least one XP field required)
+
+Curve: invention
+
+Method: Disassemble low-level item
+Type: Disassemble
+Level: 1
+XP: 120
+
+Method: Disassemble mid-level item
+Type: Disassemble
+Level: 27
+XP: 240
+
+Method: Disassemble high-level item
+Type: Disassemble
+Level: 60
+XP: 540
+
+Method: Equipment siphon (example)
+Type: Equipment
+Level: 27
+XP: 1000

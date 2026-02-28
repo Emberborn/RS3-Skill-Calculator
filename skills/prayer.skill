@@ -1,0 +1,14 @@
+# Skill data format
+# Optional: Curve: standard | invention
+# Method block:
+# Method: <name>
+# Type: <any tab name> (optional, default Default)
+# Level: <required-level> (optional, default 1)
+# XP: <value>
+#
+# Boost block:
+# Boost: <name>
+# Type: <any group name> (optional, default General)
+# XP-Percent: <percent> (optional, at least one XP field required)
+# XP-Multiplier: <multiplier> (optional, at least one XP field required)
+

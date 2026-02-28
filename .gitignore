@@ -1,0 +1,32 @@
+### IntelliJ / JetBrains ###
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+### Editors ###
+.vscode/
+
+### OS files ###
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+### Logs / temp ###
+*.log
+*.tmp
+*.temp
+
+### Cache ###
+.cache/
+.sass-cache/
+
+### Web tooling outputs (if added later) ###
+node_modules/
+dist/
+coverage/
+.parcel-cache/
+.next/
+.nuxt/
+.svelte-kit/
