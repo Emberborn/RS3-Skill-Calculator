@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-03-01
+### Added
+- Skill availability lock support in `.skill` files via `Locked: true|false` (default interpreted as locked when omitted).
+- Locked-skill visual state in the skills rail (`[LOCKED]` mode label + darkened tile styling).
+- Center-panel mode tabs for smaller screens:
+  - `Current + Boosts`
+  - `Goals`
+- Themed custom scrollbars for skills rail, center stack, and methods list areas.
+- Responsive interface staging:
+  - progressive skills-rail density shifts (`3` columns -> `2` -> `1`)
+  - top horizontal skills scroller behavior for very small widths
+  - compact mobile card behavior for center sections.
+
+### Changed
+- Locked-skill behavior:
+  - locked skills are no longer selectable/usable in detail controls
+  - locked skills remain reorderable via drag-and-drop
+  - locked skills keep full-color progress bars while other tile regions are dimmed.
+- Methods panel interaction/layout:
+  - methods header is now fixed while only method rows scroll
+  - header/body column alignment stabilized when scrollbar state changes
+  - methods container height now stays constrained to panel bounds instead of expanding page height.
+- Methods table readability and overflow handling:
+  - tighter type-tab rail sizing
+  - column width rebalance and stricter clipping for numeric columns
+  - reduced `XP / Action` width with more space allocated to `Actions Needed`.
+- Mobile/detail usability improvements:
+  - center cards made independently scrollable where needed
+  - goal sections arranged for better compact viewing on narrow screens
+  - goal/current action buttons centered in compact layouts.
+
 ## [1.3.1] - 2026-02-28
 ### Changed
 - Skill selection transitions now animate reliably without snapping by avoiding immediate skills-grid rebuild on skill click.

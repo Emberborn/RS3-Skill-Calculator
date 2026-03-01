@@ -12,3 +12,5 @@
 # XP-Percent: <percent> (optional, at least one XP field required)
 # XP-Multiplier: <multiplier> (optional, at least one XP field required)
 
+Curve: standard
+

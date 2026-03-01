@@ -38,83 +38,92 @@
 
     <section class="detail-panel panel">
       <div class="detail-left">
-        <section class="card" id="currentCard">
-          <h3>Current</h3>
-          <div class="field-grid">
-            <label>Current by</label>
-            <div class="radio-row">
-              <label><input type="radio" name="currentBy" value="level" checked /> Level</label>
-              <label><input type="radio" name="currentBy" value="xp" /> XP</label>
+        <div class="detail-left-tabbar">
+          <button id="centerTabCurrent" class="detail-left-tab active" type="button">Current + Boosts</button>
+          <button id="centerTabGoals" class="detail-left-tab" type="button">Goals</button>
+        </div>
+
+        <div id="centerPaneCurrent" class="detail-left-pane active">
+          <section class="card" id="currentCard">
+            <h3>Current</h3>
+            <div class="field-grid">
+              <label>Current by</label>
+              <div class="radio-row">
+                <label><input type="radio" name="currentBy" value="level" checked /> Level</label>
+                <label><input type="radio" name="currentBy" value="xp" /> XP</label>
+              </div>
+              <label for="currentLevel">Current level</label>
+              <input id="currentLevel" type="number" min="1" step="1" />
+              <label for="currentXp">Current XP</label>
+              <input id="currentXp" type="number" min="0" step="1" />
+              <label>Current resolved</label>
+              <div id="currentResolved" class="value">0 XP</div>
+              <label>Level (from XP)</label>
+              <div id="currentResolvedLevel" class="value">1</div>
+              <label>Boost factor</label>
+              <div id="boostFactor" class="value">x1.00</div>
+              <label>Goal tracking</label>
+              <label><input id="goalTrackingEnabled" type="checkbox" /> Enable</label>
+              <span></span>
+              <button id="resetSkillSettingsBtn" type="button">Reset Skill Settings</button>
             </div>
-            <label for="currentLevel">Current level</label>
-            <input id="currentLevel" type="number" min="1" step="1" />
-            <label for="currentXp">Current XP</label>
-            <input id="currentXp" type="number" min="0" step="1" />
-            <label>Current resolved</label>
-            <div id="currentResolved" class="value">0 XP</div>
-            <label>Level (from XP)</label>
-            <div id="currentResolvedLevel" class="value">1</div>
-            <label>Boost factor</label>
-            <div id="boostFactor" class="value">x1.00</div>
-            <label>Goal tracking</label>
-            <label><input id="goalTrackingEnabled" type="checkbox" /> Enable</label>
-            <span></span>
-            <button id="resetSkillSettingsBtn" type="button">Reset Skill Settings</button>
-          </div>
-        </section>
+          </section>
 
-        <section class="card boosts-card" id="boostsCard">
-          <h3>Boosts</h3>
-          <div id="boostsWrap" class="side-tabs"></div>
-        </section>
+          <section class="card boosts-card" id="boostsCard">
+            <h3>Boosts</h3>
+            <div id="boostsWrap" class="side-tabs"></div>
+          </section>
+        </div>
 
-        <section class="card goal-card" id="goalStartCard">
-          <h3>Goal Start</h3>
-          <div class="field-grid">
-            <label>Goal start by</label>
-            <div class="radio-row">
-              <label><input type="radio" name="goalStartBy" value="level" /> Level</label>
-              <label><input type="radio" name="goalStartBy" value="xp" checked /> XP</label>
+        <div id="centerPaneGoals" class="detail-left-pane">
+          <section class="card goal-card" id="goalStartCard">
+            <h3>Goal Start</h3>
+            <div class="field-grid">
+              <label>Goal start by</label>
+              <div class="radio-row">
+                <label><input type="radio" name="goalStartBy" value="level" /> Level</label>
+                <label><input type="radio" name="goalStartBy" value="xp" checked /> XP</label>
+              </div>
+              <label for="goalStartLevel">Goal start level</label>
+              <input id="goalStartLevel" type="number" min="1" step="1" />
+              <label for="goalStartXp">Goal start XP</label>
+              <input id="goalStartXp" type="number" min="0" step="1" />
+              <label>Resolved</label>
+              <div id="goalStartResolved" class="value">0 XP</div>
+              <span></span>
+              <button id="useCurrentAsStartBtn" type="button">Use Current as Goal Start</button>
             </div>
-            <label for="goalStartLevel">Goal start level</label>
-            <input id="goalStartLevel" type="number" min="1" step="1" />
-            <label for="goalStartXp">Goal start XP</label>
-            <input id="goalStartXp" type="number" min="0" step="1" />
-            <label>Resolved</label>
-            <div id="goalStartResolved" class="value">0 XP</div>
-            <span></span>
-            <button id="useCurrentAsStartBtn" type="button">Use Current as Goal Start</button>
-          </div>
-        </section>
+          </section>
 
-        <section class="card goal-card" id="goalEndCard">
-          <h3>Goal End</h3>
-          <div class="field-grid">
-            <label>Goal end by</label>
-            <div class="radio-row">
-              <label><input type="radio" name="goalEndBy" value="level" checked /> Level</label>
-              <label><input type="radio" name="goalEndBy" value="xp" /> XP</label>
+          <section class="card goal-card" id="goalEndCard">
+            <h3>Goal End</h3>
+            <div class="field-grid">
+              <label>Goal end by</label>
+              <div class="radio-row">
+                <label><input type="radio" name="goalEndBy" value="level" checked /> Level</label>
+                <label><input type="radio" name="goalEndBy" value="xp" /> XP</label>
+              </div>
+              <label for="goalEndLevel">Goal end level</label>
+              <input id="goalEndLevel" type="number" min="1" step="1" />
+              <label for="goalEndXp">Goal end XP</label>
+              <input id="goalEndXp" type="number" min="0" step="1" />
+              <label>Resolved</label>
+              <div id="goalEndResolved" class="value">0 XP</div>
             </div>
-            <label for="goalEndLevel">Goal end level</label>
-            <input id="goalEndLevel" type="number" min="1" step="1" />
-            <label for="goalEndXp">Goal end XP</label>
-            <input id="goalEndXp" type="number" min="0" step="1" />
-            <label>Resolved</label>
-            <div id="goalEndResolved" class="value">0 XP</div>
-          </div>
-        </section>
+          </section>
 
-        <section class="card goal-card" id="goalStatsCard">
-          <h3>Goal Statistics</h3>
-          <div class="field-grid">
-            <label>Goal start level</label><div id="goalStartLevelResolved" class="value">1</div>
-            <label>Goal end level</label><div id="goalEndLevelResolved" class="value">1</div>
-            <label>XP needed (from current)</label><div id="xpNeeded" class="value">0</div>
-            <label>Goal progress</label><div id="goalProgressText" class="value">Disabled (enable goal tracking)</div>
-            <label>Progress bar</label>
-            <div class="progress-wrap"><div id="goalProgressBar" class="progress-bar"></div></div>
-          </div>
-        </section>
+          <section class="card goal-card" id="goalStatsCard">
+            <h3>Goal Statistics</h3>
+            <div class="field-grid">
+              <label>Goal start level</label><div id="goalStartLevelResolved" class="value">1</div>
+              <label>Goal end level</label><div id="goalEndLevelResolved" class="value">1</div>
+              <label>XP needed (from current)</label><div id="xpNeeded" class="value">0</div>
+              <label>Goal progress</label><div id="goalProgressText" class="value">Disabled (enable goal tracking)</div>
+              <label>Progress bar</label>
+              <div class="progress-wrap"><div id="goalProgressBar" class="progress-bar"></div></div>
+            </div>
+          </section>
+        </div>
 
         <section class="card" id="validationCard">
           <h3>Skill File Issues</h3>
