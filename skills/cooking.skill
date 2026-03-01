@@ -1,5 +1,6 @@
 # Skill data format
 # Optional: Curve: standard | invention
+# Optional: Locked: true | false (default true)
 # Method block:
 # Method: <name>
 # Type: <any tab name> (optional, default Default)
@@ -11,4 +12,761 @@
 # Type: <any group name> (optional, default General)
 # XP-Percent: <percent> (optional, at least one XP field required)
 # XP-Multiplier: <multiplier> (optional, at least one XP field required)
+
+Curve: standard
+
+Locked: false
+
+Method: Cooked meat (Beef)
+Type: Meat
+XP: 23.5
+
+Method: Cooked meat (Pawya)
+Type: Meat
+XP: 30
+
+Method: Cooked rabbit
+Type: Meat
+XP: 30
+
+Method: Cooked meat (Yak)
+Type: Meat
+XP: 30
+
+Method: Cooked meat (Rat)
+Type: Meat
+XP: 30
+
+Method: Cooked meat (Bear)
+Type: Meat
+XP: 30
+
+Method: Cooked chicken
+Type: Meat
+XP: 30
+
+Method: Ugthanki kebab
+Type: Meat
+XP: 40
+
+Method: Ugthanki meat
+Type: Meat
+XP: 40
+
+Method: Ugthanki kebab (Scratch)
+Type: Meat
+XP: 40
+
+Method: Roasted bird meat
+Type: Meat
+Level: 11
+XP: 62
+
+Method: Thin snail meat
+Type: Meat
+Level: 12
+XP: 70
+
+Method: Bacon
+Type: Meat
+Level: 14
+XP: 68
+
+Method: Roastedrabbit
+Type: Meat
+Level: 16
+XP: 72
+
+Method: Spider on stick
+Type: Meat
+Level: 16
+XP: 80
+
+Method: Lean snail meat
+Type: Meat
+Level: 17
+XP: 80
+
+Method: Roasted beast meat
+Type: Meat
+Level: 21
+XP: 82
+
+Method: Giant crab meat
+Type: Meat
+Level: 21
+XP: 100
+
+Method: Fat snail meat
+Type: Meat
+Level: 22
+XP: 95
+
+Method: Bacon stack
+Type: Meat
+Level: 24
+XP: 88
+
+Method: Roasted chompy
+Type: Meat
+Level: 30
+XP: 140
+
+Method: Cooked fishcake
+Type: Meat
+Level: 31
+XP: 100
+
+Method: Bacon pile
+Type: Meat
+Level: 34
+XP: 108
+
+Method: Jubbly
+Type: Meat
+Level: 41
+XP: 160
+
+Method: Bacon heap
+Type: Meat
+Level: 44
+XP: 135
+
+Method: Oomlie wrap
+Type: Meat
+Level: 50
+XP: 110
+
+Method: Oomlie wrap (Scratch)
+Type: Meat
+Level: 50
+XP: 110
+
+Method: Bacon mound
+Type: Meat
+Level: 54
+XP: 158
+
+Method: Bagrada rex meat
+Type: Meat
+Level: 75
+XP: 150
+
+Method: Scimitops meat
+Type: Meat
+Level: 75
+XP: 150
+
+Method: Arcane apoterrasaur meat
+Type: Meat
+Level: 75
+XP: 150
+
+Method: Spicati apoterrasaur meat
+Type: Meat
+Level: 81
+XP: 155
+
+Method: Asciatops meat
+Type: Meat
+Level: 81
+XP: 160
+
+Method: Corbicula rex meat
+Type: Meat
+Level: 81
+XP: 170
+
+Method: Malletops meat
+Type: Meat
+Level: 89
+XP: 215
+
+Method: Oculi apoterrasaur meat
+Type: Meat
+Level: 89
+XP: 215
+
+Method: Pavosaurus rex meat
+Type: Meat
+Level: 89
+XP: 215
+
+Method: Pekin chicken
+Type: Meat
+Level: 91
+XP: 30
+
+Method: Karambwanji
+Type: Fish
+XP: 10
+
+Method: Minnow
+Type: Fish
+XP: 30
+
+Method: Anchovies
+Type: Fish
+XP: 30
+
+Method: Shrimps
+Type: Fish
+XP: 30
+
+Method: Crayfish
+Type: Fish
+XP: 30
+
+Method: Sardine
+Type: Fish
+XP: 40
+
+Method: Cooked karambwan
+Type: Fish
+XP: 190
+
+Method: Herring
+Type: Fish
+Level: 5
+XP: 50
+
+Method: Mackerel
+Type: Fish
+Level: 10
+XP: 30
+
+Method: Trout
+Type: Fish
+Level: 15
+XP: 70
+
+Method: Cod
+Type: Fish
+Level: 18
+XP: 75
+
+Method: Pike
+Type: Fish
+Level: 20
+XP: 80
+
+Method: Salmon
+Type: Fish
+Level: 25
+XP: 90
+
+Method: Cooked slimy eel
+Type: Fish
+Level: 28
+XP: 95
+
+Method: Tuna
+Type: Fish
+Level: 30
+XP: 100
+
+Method: Rainbow fish
+Type: Fish
+Level: 35
+XP: 110
+
+Method: Cave eel
+Type: Fish
+Level: 38
+XP: 115
+
+Method: Lobster
+Type: Fish
+Level: 40
+XP: 120
+
+Method: Bass
+Type: Fish
+Level: 43
+XP: 130
+
+Method: Swordfish
+Type: Fish
+Level: 45
+XP: 140
+
+Method: Desert sole
+Type: Fish
+Level: 52
+XP: 142.5
+
+Method: Lava eel
+Type: Fish
+Level: 53
+XP: 30
+
+Method: Catfish
+Type: Fish
+Level: 60
+XP: 145
+
+Method: Monkfish
+Type: Fish
+Level: 64
+XP: 150
+
+Method: Ghostly sole
+Type: Fish
+Level: 66
+XP: 160
+
+Method: Green blubber jellyfish
+Type: Fish
+Level: 72
+XP: 165
+
+Method: Beltfish
+Type: Fish
+Level: 72
+XP: 165
+
+Method: Shark
+Type: Fish
+Level: 80
+XP: 210
+
+Method: Sea turtle
+Type: Fish
+Level: 82
+XP: 211.3
+
+Method: Great maki
+Type: Fish
+Level: 84
+XP: 150
+
+Method: Great white shark
+Type: Fish
+Level: 84
+XP: 212
+
+Method: Cavefish
+Type: Fish
+Level: 88
+XP: 214
+
+Method: Fish oil (Raw sillago)
+Type: Fish
+Level: 91
+XP: 120
+
+Method: Fish oil (Raw tarpon)
+Type: Fish
+Level: 91
+XP: 120
+
+Method: Fish oil (Raw seerfish)
+Type: Fish
+Level: 91
+XP: 120
+
+Method: Great gunkan
+Type: Fish
+Level: 91
+XP: 180
+
+Method: Manta ray
+Type: Fish
+Level: 91
+XP: 216.3
+
+Method: Rocktail
+Type: Fish
+Level: 93
+XP: 225
+
+Method: Rocktail soup
+Type: Fish
+Level: 93
+XP: 500
+
+Method: Rocktail soup (Scratch)
+Type: Fish
+Level: 93
+XP: 725
+
+Method: Arc gumbo
+Type: Fish
+Level: 94
+XP: 130
+
+Method: Tiger shark
+Type: Fish
+Level: 95
+XP: 230
+
+Method: Blue blubber jellyfish
+Type: Fish
+Level: 95
+XP: 235
+
+Method: Shark soup
+Type: Fish
+Level: 96
+XP: 240
+
+Method: Wobbegong oil
+Type: Fish
+Level: 96
+XP: 240
+
+Method: Sailfish
+Type: Fish
+Level: 99
+XP: 270
+
+Method: Sailfish soup
+Type: Fish
+Level: 99
+XP: 600
+
+Method: Sailfish soup (Scratch)
+Type: Fish
+Level: 99
+XP: 870
+
+Method: Redberry pie
+Type: Pie
+Level: 10
+XP: 78
+
+Method: Redberry pie (Scratch)
+Type: Pie
+Level: 10
+XP: 78
+
+Method: Meat pie
+Type: Pie
+Level: 20
+XP: 110
+
+Method: Meat pie (Scratch)
+Type: Pie
+Level: 20
+XP: 110
+
+Method: Mud pie
+Type: Pie
+Level: 29
+XP: 128
+
+Method: Mud pie (Scratch)
+Type: Pie
+Level: 29
+XP: 128
+
+Method: Apple pie
+Type: Pie
+Level: 30
+XP: 130
+
+Method: Apple pie (Scratch)
+Type: Pie
+Level: 30
+XP: 130
+
+Method: Garden pie
+Type: Pie
+Level: 34
+XP: 138
+
+Method: Garden pie (Scratch)
+Type: Pie
+Level: 34
+XP: 138
+
+Method: Fish pie
+Type: Pie
+Level: 47
+XP: 164
+
+Method: Fish pie (Scratch)
+Type: Pie
+Level: 47
+XP: 164
+
+Method: Admiral pie
+Type: Pie
+Level: 70
+XP: 210
+
+Method: Admiral pie (Scratch)
+Type: Pie
+Level: 70
+XP: 210
+
+Method: Pork pie
+Type: Pie
+Level: 74
+XP: 210
+
+Method: Pork pie (Scratch)
+Type: Pie
+Level: 74
+XP: 210
+
+Method: Pork pie (Semi-Scratch)
+Type: Pie
+Level: 74
+XP: 210
+
+Method: Wilder pie (Scratch)
+Type: Pie
+Level: 85
+XP: 240
+
+Method: Wild pie
+Type: Pie
+Level: 85
+XP: 240
+
+Method: Wild pie (Scratch)
+Type: Pie
+Level: 85
+XP: 240
+
+Method: Wilder pie (Crished dragonstone)
+Type: Pie
+Level: 85
+XP: 250
+
+Method: Wilder pie (Dragonstone)
+Type: Pie
+Level: 85
+XP: 250
+
+Method: Wilder pie (Semi-Scratch)
+Type: Pie
+Level: 85
+XP: 240
+
+Method: Summer pie
+Type: Pie
+Level: 95
+XP: 260
+
+Method: Summer pie (Scratch)
+Type: Pie
+Level: 95
+XP: 260
+
+Method: Cheesecake
+Type: Cheesecake
+Level: 32
+XP: 170
+
+Method: Vanilla cheesecake
+Type: Cheesecake
+Level: 32
+XP: 180
+
+Method: Chocolate cheesecake
+Type: Cheesecake
+Level: 32
+XP: 190
+
+Method: Strawberry cheesecake
+Type: Cheesecake
+Level: 47
+XP: 200
+
+Method: Lemon cheesecake
+Type: Cheesecake
+Level: 52
+XP: 210
+
+Method: Bacon cheesecake
+Type: Cheesecake
+Level: 57
+XP: 210
+
+Method: Plain pizza
+Type: Pizza
+Level: 35
+XP: 143
+
+Method: Plain pizza (Scratch)
+Type: Pizza
+Level: 35
+XP: 143
+
+Method: Meat pizza
+Type: Pizza
+Level: 35
+XP: 26
+
+Method: Meat pizza (Scratch)
+Type: Pizza
+Level: 35
+XP: 169
+
+Method: Anchovy pizza
+Type: Pizza
+Level: 55
+XP: 39
+
+Method: Anchovy pizza (Scratch)
+Type: Pizza
+Level: 55
+XP: 182
+
+Method: Pineapple pizza
+Type: Pizza
+Level: 65
+XP: 45
+
+Method: Pineapple pizza (Scratch)
+Type: Pizza
+Level: 65
+XP: 188
+
+Method: Banana pizza
+Type: Pizza
+Level: 85
+XP: 89
+
+Method: Banana pizza (Scratch)
+Type: Pizza
+Level: 85
+XP: 232
+
+Method: Baked potato
+Type: Potatoes
+Level: 7
+XP: 15
+
+Method: Potato with butter
+Type: Potatoes
+Level: 39
+XP: 15
+
+Method: Potato with butter (Scratch)
+Type: Potatoes
+Level: 39
+XP: 55
+
+Method: Chilli potato
+Type: Potatoes
+Level: 41
+XP: 15
+
+Method: Chilli potato (Scratch)
+Type: Potatoes
+Level: 41
+XP: 120
+
+Method: Potato with cheese
+Type: Potatoes
+Level: 47
+XP: 40
+
+Method: Potato with cheese (Scratch)
+Type: Potatoes
+Level: 47
+XP: 95
+
+Method: Egg potato
+Type: Potatoes
+Level: 51
+XP: 45
+
+Method: Egg potato (Scratch)
+Type: Potatoes
+Level: 51
+XP: 200
+
+Method: Mushroom potato
+Type: Potatoes
+Level: 64
+XP: 55
+
+Method: Mushroom potato (Scratch)
+Type: Potatoes
+Level: 64
+XP: 352
+
+Method: Tuna potato
+Type: Potatoes
+Level: 68
+XP: 10
+
+Method: Tuna potato (Scratch)
+Type: Potatoes
+Level: 68
+XP: 433
+
+Method: Tuna potato (Semi-Scratch)
+Type: Potatoes
+Level: 68
+XP: 214
+
+Method: Cider (4)
+Type: Brewing
+Level: 14
+XP: 182
+
+Method: Dwarven stout (4)
+Type: Brewing
+Level: 19
+XP: 215
+
+Method: Nettle tea
+Type: Brewing
+Level: 20
+XP: 53
+
+Method: Asgarnian ale (4)
+Type: Brewing
+Level: 24
+XP: 248
+
+Method: Greenman's ale (4)
+Type: Brewing
+Level: 29
+XP: 281
+
+Method: Mind bomb (4)
+Type: Brewing
+Level: 34
+XP: 314
+
+Method: Jug of wine
+Type: Brewing
+Level: 35
+XP: 200
+
+Method: Dragon bitter (4)
+Type: Brewing
+Level: 39
+XP: 347
+
+Method: Moonlight mead (4)
+Type: Brewing
+Level: 44
+XP: 380
+
+Method: Axeman's folly (4)
+Type: Brewing
+Level: 49
+XP: 413
+
+Method: Chef's delight (4)
+Type: Brewing
+Level: 54
+XP: 446
+
+Method: Slayer's respite (4)
+Type: Brewing
+Level: 59
+XP: 479
+
+Method: Pigswill (4)
+Type: Brewing
+Level: 64
+XP: 380
 

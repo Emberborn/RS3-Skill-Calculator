@@ -1,5 +1,6 @@
 # Skill data format
 # Optional: Curve: standard | invention
+# Optional: Locked: true | false (default true)
 # Method block:
 # Method: <name>
 # Type: <any tab name> (optional, default Default)
@@ -11,4 +12,8 @@
 # Type: <any group name> (optional, default General)
 # XP-Percent: <percent> (optional, at least one XP field required)
 # XP-Multiplier: <multiplier> (optional, at least one XP field required)
+
+Curve: standard
+
+Locked: true
 

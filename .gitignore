@@ -30,3 +30,4 @@ coverage/
 .next/
 .nuxt/
 .svelte-kit/
+/src/

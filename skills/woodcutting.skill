@@ -1,5 +1,6 @@
 # Skill data format
 # Optional: Curve: standard | invention
+# Optional: Locked: true | false (default true)
 # Method block:
 # Method: <name>
 # Type: <any tab name> (optional, default Default)
@@ -12,8 +13,11 @@
 # XP-Percent: <percent> (optional, at least one XP field required)
 # XP-Multiplier: <multiplier> (optional, at least one XP field required)
 
+Curve: standard
+
+Locked: true
+
 Method: Logs
-Level: 1
 XP: 25
 
 Method: Oak logs
@@ -59,3 +63,4 @@ XP-Percent: 6%
 Boost: Double XP Weekend
 Type: Event
 XP-Multiplier: 2
+

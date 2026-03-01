@@ -72,6 +72,10 @@ const refs = {
   goalStartCard: document.getElementById("goalStartCard"),
   goalEndCard: document.getElementById("goalEndCard"),
   goalStatsCard: document.getElementById("goalStatsCard"),
+  centerTabCurrent: document.getElementById("centerTabCurrent"),
+  centerTabGoals: document.getElementById("centerTabGoals"),
+  centerPaneCurrent: document.getElementById("centerPaneCurrent"),
+  centerPaneGoals: document.getElementById("centerPaneGoals"),
   skillButtonTemplate: document.getElementById("skillButtonTemplate"),
 };
 
@@ -104,6 +108,8 @@ async function initialize() {
   }
   bindTopbarEvents();
   bindInputEvents();
+  bindCenterTabEvents();
+  window.addEventListener("resize", () => syncMethodTableHeaderGutter());
   const skills = await loadSkills();
   state.skills = skills;
   state.skillByKey = new Map(skills.map((s) => [s.key, s]));
@@ -111,6 +117,30 @@ async function initialize() {
   hydrateProfileUI();
   renderAll();
   setSaveStatus("Ready");
+}
+
+function bindCenterTabEvents() {
+  refs.centerTabCurrent?.addEventListener("click", () => setActiveCenterPane("current"));
+  refs.centerTabGoals?.addEventListener("click", () => setActiveCenterPane("goals"));
+}
+
+function setActiveCenterPane(pane) {
+  const isCurrent = pane === "current";
+  refs.centerTabCurrent?.classList.toggle("active", isCurrent);
+  refs.centerTabGoals?.classList.toggle("active", !isCurrent);
+  refs.centerPaneCurrent?.classList.toggle("active", isCurrent);
+  refs.centerPaneGoals?.classList.toggle("active", !isCurrent);
+}
+
+function updateCenterTabAvailability() {
+  const enabled = !!refs.goalTrackingEnabled?.checked;
+  if (refs.centerTabGoals) {
+    refs.centerTabGoals.disabled = !enabled;
+    refs.centerTabGoals.classList.toggle("disabled", !enabled);
+  }
+  if (!enabled && refs.centerPaneGoals?.classList.contains("active")) {
+    setActiveCenterPane("current");
+  }
 }
 
 function setSaveStatus(text) {
@@ -392,6 +422,7 @@ function parseSkillFile(fileName, text) {
   const base = fileName.replace(/\.[^.]+$/, "");
   const name = toDisplayName(base);
   let curve = base.toLowerCase() === "invention" ? buildInventionCurve() : buildStandardCurve();
+  let locked = true;
   let icon = null;
   const methods = [];
   const boosts = [];
@@ -417,6 +448,13 @@ function parseSkillFile(fileName, text) {
     }
     if (lower.startsWith("icon:")) {
       icon = line.slice(5).trim();
+      continue;
+    }
+    if (lower.startsWith("locked:")) {
+      const v = line.slice(7).trim().toLowerCase();
+      if (["true", "1", "yes", "on", "locked"].includes(v)) locked = true;
+      else if (["false", "0", "no", "off", "unlocked"].includes(v)) locked = false;
+      else issues.push({ line: lineNo, message: "Invalid Locked value. Use true/false." });
       continue;
     }
     if (lower.startsWith("method:")) {
@@ -493,6 +531,7 @@ function parseSkillFile(fileName, text) {
       key: normalizeKey(name),
       fileName,
       name,
+      locked,
       curve,
       methods,
       boosts,
@@ -576,6 +615,11 @@ function makeCurve(name, xpByLevel) {
 function renderAll() {
   ensureProfileSkillState();
   state.selectedSkillKey = state.profileData.selectedSkillKey ?? state.selectedSkillKey;
+  const selected = state.skillByKey.get(state.selectedSkillKey);
+  if (!selected || selected.locked) {
+    state.selectedSkillKey = initialSkillKey();
+    state.profileData.selectedSkillKey = state.selectedSkillKey;
+  }
   refs.virtualToggle.checked = !!state.profileData.showVirtualLevels;
   renderSkillsGrid();
   renderValidationPanel();
@@ -606,13 +650,16 @@ function renderValidationPanel() {
 
 function initialSkillKey() {
   const saved = state.profileData.selectedSkillKey;
-  if (saved && state.skillByKey.has(saved)) return saved;
-  const attack = state.skills.find((s) => s.name.toLowerCase() === "attack");
-  return (attack ?? state.skills[0])?.key ?? null;
+  if (saved && state.skillByKey.has(saved) && !state.skillByKey.get(saved).locked) return saved;
+  const attack = state.skills.find((s) => s.name.toLowerCase() === "attack" && !s.locked);
+  if (attack) return attack.key;
+  return state.skills.find((s) => !s.locked)?.key ?? null;
 }
 
 function selectedSkill() {
-  return state.skillByKey.get(state.selectedSkillKey) ?? null;
+  const skill = state.skillByKey.get(state.selectedSkillKey) ?? null;
+  if (!skill || skill.locked) return null;
+  return skill;
 }
 
 function setSelectedSkillButtonState(prevKey, nextKey) {
@@ -637,6 +684,7 @@ function renderSkillsGrid() {
     button.dataset.skillKey = skill.key;
     button.draggable = true;
     if (skill.key === state.selectedSkillKey) button.classList.add("selected");
+    if (skill.locked) button.classList.add("locked");
 
     const titleEl = button.querySelector(".skill-btn-title");
     titleEl.textContent = "";
@@ -662,7 +710,7 @@ function renderSkillsGrid() {
 
     button.querySelector(".skill-btn-level").textContent = `${shownLevel} / ${maxLevel}`;
     button.querySelector(".skill-btn-xp").textContent = `${formatInt(evalResult.currentXp)} xp`;
-    button.querySelector(".skill-btn-mode").textContent = evalResult.goalActive ? "[GOAL]" : "[NEXT]";
+    button.querySelector(".skill-btn-mode").textContent = skill.locked ? "[LOCKED]" : (evalResult.goalActive ? "[GOAL]" : "[NEXT]");
 
     const pct = evalResult.buttonProgress;
     const fill = button.querySelector(".skill-btn-progress-fill");
@@ -672,6 +720,7 @@ function renderSkillsGrid() {
     fill.classList.toggle("next-track", !evalResult.goalActive);
 
     button.addEventListener("click", () => {
+      if (skill.locked) return;
       if (state.selectedSkillKey === skill.key) return;
       const prevKey = state.selectedSkillKey;
       state.selectedSkillKey = skill.key;
@@ -725,8 +774,19 @@ function renderSkillsGrid() {
 
 function renderDetail() {
   const skill = selectedSkill();
-  if (!skill) return;
+  if (!skill) {
+    refs.boostsWrap.innerHTML = `<div class="tab-content boosts-empty">This skill is locked.</div>`;
+    refs.methodsWrap.innerHTML = `<div class="tab-content boosts-empty">This skill is locked.</div>`;
+    for (const el of [refs.currentLevel, refs.currentXp, refs.goalStartLevel, refs.goalStartXp, refs.goalEndLevel, refs.goalEndXp, refs.goalTrackingEnabled, refs.useCurrentAsStartBtn, refs.resetSkillSettingsBtn]) {
+      if (el) el.disabled = true;
+    }
+    return;
+  }
   const skillState = getSkillState(skill.key);
+  if (skillState.goalTrackingEnabled) setActiveCenterPane("goals");
+  for (const el of [refs.currentLevel, refs.currentXp, refs.goalStartLevel, refs.goalStartXp, refs.goalEndLevel, refs.goalEndXp, refs.goalTrackingEnabled, refs.useCurrentAsStartBtn, refs.resetSkillSettingsBtn]) {
+    if (el) el.disabled = false;
+  }
 
   state.suppressInput = true;
   try {
@@ -751,6 +811,7 @@ function renderDetail() {
 
   renderBoostTabs(skill, skillState);
   renderMethodTabs(skill, skillState);
+  updateCenterTabAvailability();
   recalcAndRender(false);
 }
 
@@ -863,10 +924,22 @@ function renderMethodTabs(skill, skillState) {
     tabList.appendChild(btn);
   }
 
-  const table = document.createElement("table");
-  table.className = "method-table";
-  table.innerHTML = "<thead><tr><th>Action</th><th>Req Lvl</th><th>XP / Action</th><th>Actions Needed</th></tr></thead><tbody></tbody>";
-  content.appendChild(table);
+  const headerWrap = document.createElement("div");
+  headerWrap.className = "method-table-header-wrap";
+  const headerTable = document.createElement("table");
+  headerTable.className = "method-table method-table-head";
+  headerTable.innerHTML = "<thead><tr><th>Action</th><th>Req Lvl</th><th>XP / Action</th><th>Actions Needed</th></tr></thead>";
+  headerWrap.appendChild(headerTable);
+
+  const tableWrap = document.createElement("div");
+  tableWrap.className = "method-table-wrap";
+  const bodyTable = document.createElement("table");
+  bodyTable.className = "method-table method-table-body";
+  bodyTable.innerHTML = "<tbody></tbody>";
+  tableWrap.appendChild(bodyTable);
+
+  content.append(headerWrap, tableWrap);
+  syncMethodTableHeaderGutter();
 }
 function recalcAndRender(refreshSkillsGrid = true) {
   if (state.suppressInput) return;
@@ -892,6 +965,7 @@ function recalcAndRender(refreshSkillsGrid = true) {
   const goalEndLevel = skill.curve.levelForXp(goalEndXp);
 
   const goalTrackingEnabled = refs.goalTrackingEnabled.checked;
+  updateCenterTabAvailability();
   const goalStartIsSet = !goalStartByXp || String(refs.goalStartXp.value).trim() !== "";
   const goalActive = goalTrackingEnabled && goalStartIsSet && goalEndXp >= currentXp;
 
@@ -972,7 +1046,7 @@ function renderMethodRows(skill, calc) {
     .filter((m) => m.type === selectedType)
     .sort((a, b) => (a.requiredLevel - b.requiredLevel) || a.action.localeCompare(b.action));
 
-  const tbody = refs.methodsWrap.querySelector("tbody");
+  const tbody = refs.methodsWrap.querySelector(".method-table-body tbody");
   if (!tbody) return;
   tbody.innerHTML = "";
 
@@ -986,6 +1060,15 @@ function renderMethodRows(skill, calc) {
     tr.innerHTML = `<td>${escapeHtml(m.action)}</td><td>${m.requiredLevel}</td><td>${formatNumber(effectiveXp)}</td><td>${formatInt(actions)}</td>`;
     tbody.appendChild(tr);
   }
+  syncMethodTableHeaderGutter();
+}
+
+function syncMethodTableHeaderGutter() {
+  const headerWrap = refs.methodsWrap.querySelector(".method-table-header-wrap");
+  const tbody = refs.methodsWrap.querySelector(".method-table-body tbody");
+  if (!headerWrap || !tbody) return;
+  const activeScrollbarWidth = Math.max(0, tbody.offsetWidth - tbody.clientWidth);
+  headerWrap.style.paddingRight = `${activeScrollbarWidth}px`;
 }
 
 function evaluateSkill(skill) {
