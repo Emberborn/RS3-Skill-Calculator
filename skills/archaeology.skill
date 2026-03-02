@@ -1,5 +1,6 @@
 # Skill data format
 # Optional: Curve: standard | invention
+# Optional: Locked: true | false (default true)
 # Method block:
 # Method: <name>
 # Type: <any tab name> (optional, default Default)

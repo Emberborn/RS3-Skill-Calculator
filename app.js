@@ -4,6 +4,7 @@ const INSTRUCTIONS_FILE = "./INSTRUCTIONS.md";
 const REPORT_ISSUE_URL = typeof window !== "undefined" ? String(window.REPORT_ISSUE_URL || "").trim() : "";
 const MAX_XP = 200_000_000;
 const REAL_MAX_LEVEL = 120;
+const METHOD_ALL_TAB_LABEL = "All";
 const WEB_BASE_URL = new URL(".", import.meta.url);
 const APP_ROOT_URL = new URL("../", import.meta.url);
 const RS3_SKILL_ORDER = [
@@ -34,6 +35,7 @@ const refs = {
   aboutBtn: document.getElementById("aboutBtn"),
   instructionsBtn: document.getElementById("instructionsBtn"),
   reportIssueBtn: document.getElementById("reportIssueBtn"),
+  disableNotificationsToggle: document.getElementById("disableNotificationsToggle"),
   changelogModal: document.getElementById("changelogModal"),
   changelogBackdrop: document.getElementById("changelogBackdrop"),
   closeChangelogBtn: document.getElementById("closeChangelogBtn"),
@@ -45,22 +47,27 @@ const refs = {
   instructionsTitle: document.getElementById("instructionsTitle"),
   instructionsContent: document.getElementById("instructionsContent"),
   saveStatus: document.getElementById("saveStatus"),
+  bottomNotice: document.getElementById("bottomNotice"),
+  wikiPreview: document.getElementById("wikiPreview"),
   validationCard: document.getElementById("validationCard"),
   validationList: document.getElementById("validationList"),
   virtualToggle: document.getElementById("virtualToggle"),
   skillsGrid: document.getElementById("skillsGrid"),
   boostsWrap: document.getElementById("boostsWrap"),
   methodsWrap: document.getElementById("methodsWrap"),
-  currentLevel: document.getElementById("currentLevel"),
   currentXp: document.getElementById("currentXp"),
   goalStartLevel: document.getElementById("goalStartLevel"),
   goalStartXp: document.getElementById("goalStartXp"),
   goalEndLevel: document.getElementById("goalEndLevel"),
   goalEndXp: document.getElementById("goalEndXp"),
+  goalStartLevelLabel: document.getElementById("goalStartLevelLabel"),
+  goalStartXpLabel: document.getElementById("goalStartXpLabel"),
+  goalStartResolvedLabel: document.getElementById("goalStartResolvedLabel"),
+  goalEndLevelLabel: document.getElementById("goalEndLevelLabel"),
+  goalEndXpLabel: document.getElementById("goalEndXpLabel"),
+  goalEndResolvedLabel: document.getElementById("goalEndResolvedLabel"),
   goalTrackingEnabled: document.getElementById("goalTrackingEnabled"),
   useCurrentAsStartBtn: document.getElementById("useCurrentAsStartBtn"),
-  currentResolved: document.getElementById("currentResolved"),
-  currentResolvedLevel: document.getElementById("currentResolvedLevel"),
   goalStartResolved: document.getElementById("goalStartResolved"),
   goalEndResolved: document.getElementById("goalEndResolved"),
   goalStartLevelResolved: document.getElementById("goalStartLevelResolved"),
@@ -72,6 +79,9 @@ const refs = {
   goalStartCard: document.getElementById("goalStartCard"),
   goalEndCard: document.getElementById("goalEndCard"),
   goalStatsCard: document.getElementById("goalStatsCard"),
+  currentTitle: document.getElementById("currentTitle"),
+  methodsTitle: document.getElementById("methodsTitle"),
+  methodsHeaderControls: document.getElementById("methodsHeaderControls"),
   centerTabCurrent: document.getElementById("centerTabCurrent"),
   centerTabGoals: document.getElementById("centerTabGoals"),
   centerPaneCurrent: document.getElementById("centerPaneCurrent"),
@@ -91,11 +101,31 @@ const state = {
   changelogText: "",
   changelogVersion: "unknown",
   instructionsText: "",
+  noticeTimer: null,
+  noticeQueue: [],
+  noticeActive: false,
+  wikiPreviewCache: new Map(),
+  wikiPreviewTimer: null,
+  wikiPreviewTargetTitle: null,
+  wikiPreviewRequestId: 0,
 };
 
 const numberFormat = new Intl.NumberFormat("en-US");
 
 initialize();
+
+function setDraggingCursorEnabled(enabled) {
+  const active = !!enabled;
+  document.body.classList.toggle("is-dragging", active);
+  document.documentElement.classList.toggle("is-dragging", active);
+  if (active) {
+    document.body.style.setProperty("cursor", "var(--cursor-use) 0 0, grabbing", "important");
+    document.documentElement.style.setProperty("cursor", "var(--cursor-use) 0 0, grabbing", "important");
+  } else {
+    document.body.style.removeProperty("cursor");
+    document.documentElement.style.removeProperty("cursor");
+  }
+}
 
 async function initialize() {
   await loadChangelogFile();
@@ -109,6 +139,8 @@ async function initialize() {
   bindTopbarEvents();
   bindInputEvents();
   bindCenterTabEvents();
+  bindGlobalDragCursorEvents();
+  bindWikiPreviewEvents();
   window.addEventListener("resize", () => syncMethodTableHeaderGutter());
   const skills = await loadSkills();
   state.skills = skills;
@@ -119,17 +151,193 @@ async function initialize() {
   setSaveStatus("Ready");
 }
 
-function bindCenterTabEvents() {
-  refs.centerTabCurrent?.addEventListener("click", () => setActiveCenterPane("current"));
-  refs.centerTabGoals?.addEventListener("click", () => setActiveCenterPane("goals"));
+function bindGlobalDragCursorEvents() {
+  document.addEventListener("dragstart", () => setDraggingCursorEnabled(true));
+  document.addEventListener("dragover", () => setDraggingCursorEnabled(true));
+  document.addEventListener("dragend", () => setDraggingCursorEnabled(false));
+  document.addEventListener("drop", () => setDraggingCursorEnabled(false));
 }
 
-function setActiveCenterPane(pane) {
-  const isCurrent = pane === "current";
+function bindWikiPreviewEvents() {
+  if (!refs.methodsWrap || !refs.wikiPreview) return;
+  document.addEventListener("mouseover", onMethodsLinkMouseOver);
+  document.addEventListener("mousemove", onMethodsLinkMouseMove);
+  document.addEventListener("mouseout", onMethodsLinkMouseOut);
+}
+
+function findPreviewLink(target) {
+  if (!(target instanceof Element)) return null;
+  const direct = target.closest("a[data-wiki-preview-title]");
+  if (direct instanceof HTMLAnchorElement) return direct;
+  const cell = target.closest("td");
+  if (!cell) return null;
+  const nested = cell.querySelector("a[data-wiki-preview-title]");
+  return nested instanceof HTMLAnchorElement ? nested : null;
+}
+
+function onMethodsLinkMouseOver(event) {
+  if (!refs.methodsWrap?.contains(event.target instanceof Node ? event.target : null)) return;
+  const target = findPreviewLink(event.target);
+  if (!target || !(target instanceof HTMLAnchorElement)) return;
+  const title = String(target.dataset.wikiPreviewTitle || "").trim();
+  if (!title) return;
+  if (window.WIKI_PREVIEW_DEBUG) console.debug("[wiki-preview] over", title);
+  state.wikiPreviewTargetTitle = title;
+  if (state.wikiPreviewTimer) {
+    window.clearTimeout(state.wikiPreviewTimer);
+    state.wikiPreviewTimer = null;
+  }
+  renderWikiPreviewLoading(title);
+  setWikiPreviewVisible(true);
+  positionWikiPreview(event.clientX, event.clientY);
+  state.wikiPreviewTimer = window.setTimeout(async () => {
+    state.wikiPreviewTimer = null;
+    const requestId = ++state.wikiPreviewRequestId;
+    const data = await fetchWikiPreviewData(title);
+    if (requestId !== state.wikiPreviewRequestId) return;
+    if (state.wikiPreviewTargetTitle !== title) return;
+    renderWikiPreviewData(data, title);
+  }, 180);
+}
+
+function onMethodsLinkMouseMove(event) {
+  if (!refs.methodsWrap?.contains(event.target instanceof Node ? event.target : null)) return;
+  if (!state.wikiPreviewTargetTitle) {
+    const link = findPreviewLink(event.target);
+    if (link) onMethodsLinkMouseOver(event);
+    return;
+  }
+  positionWikiPreview(event.clientX, event.clientY);
+}
+
+function onMethodsLinkMouseOut(event) {
+  if (!refs.methodsWrap?.contains(event.target instanceof Node ? event.target : null)) return;
+  const from = findPreviewLink(event.target);
+  if (!from) return;
+  const to = findPreviewLink(event.relatedTarget);
+  if (to === from) return;
+  if (window.WIKI_PREVIEW_DEBUG) console.debug("[wiki-preview] out");
+  hideWikiPreview();
+}
+
+function hideWikiPreview() {
+  if (state.wikiPreviewTimer) {
+    window.clearTimeout(state.wikiPreviewTimer);
+    state.wikiPreviewTimer = null;
+  }
+  state.wikiPreviewTargetTitle = null;
+  setWikiPreviewVisible(false);
+}
+
+function setWikiPreviewVisible(visible) {
+  if (!refs.wikiPreview) return;
+  refs.wikiPreview.hidden = !visible;
+  refs.wikiPreview.setAttribute("aria-hidden", visible ? "false" : "true");
+  refs.wikiPreview.classList.toggle("show", visible);
+}
+
+function positionWikiPreview(mouseX, mouseY) {
+  const el = refs.wikiPreview;
+  if (!el || el.hidden) return;
+  const pad = 8;
+  const offset = 14;
+  let left = mouseX + offset;
+  let top = mouseY + offset;
+  const rect = el.getBoundingClientRect();
+  if (left + rect.width + pad > window.innerWidth) left = Math.max(pad, mouseX - rect.width - offset);
+  if (top + rect.height + pad > window.innerHeight) top = Math.max(pad, mouseY - rect.height - offset);
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
+}
+
+function renderWikiPreviewLoading(title) {
+  const el = refs.wikiPreview;
+  if (!el) return;
+  if (window.WIKI_PREVIEW_DEBUG) console.debug("[wiki-preview] loading", title);
+  el.classList.add("wiki-preview-loading");
+  el.innerHTML = `
+    <div class="wiki-preview-head">${escapeHtml(title)}</div>
+    <div class="wiki-preview-body">
+      <div class="wiki-preview-text">Loading preview...</div>
+    </div>`;
+}
+
+function renderWikiPreviewData(data, fallbackTitle) {
+  const el = refs.wikiPreview;
+  if (!el) return;
+  if (window.WIKI_PREVIEW_DEBUG) console.debug("[wiki-preview] data", data?.title || fallbackTitle);
+  el.classList.remove("wiki-preview-loading");
+  const title = escapeHtml(data.title || fallbackTitle);
+  const summary = escapeHtml(data.summary || "No summary available.");
+  const thumbHtml = data.thumb
+    ? `<div class="wiki-preview-thumb"><img src="${escapeHtml(data.thumb)}" alt="" /></div>`
+    : `<div class="wiki-preview-thumb"></div>`;
+  el.innerHTML = `
+    <div class="wiki-preview-head">${title}</div>
+    <div class="wiki-preview-body">
+      ${thumbHtml}
+      <div class="wiki-preview-text">${summary}</div>
+    </div>`;
+}
+
+async function fetchWikiPreviewData(title) {
+  const cached = state.wikiPreviewCache.get(title);
+  if (cached) return cached;
+  const params = new URLSearchParams({
+    action: "query",
+    format: "json",
+    origin: "*",
+    prop: "extracts|pageimages",
+    exintro: "1",
+    explaintext: "1",
+    pithumbsize: "120",
+    titles: title,
+  });
+  const url = `https://runescape.wiki/api.php?${params.toString()}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    const pages = json?.query?.pages || {};
+    const page = Object.values(pages)[0] || {};
+    const rawExtract = String(page.extract || "").trim();
+    const data = {
+      title: String(page.title || title),
+      summary: rawExtract ? truncateText(rawExtract, 220) : "No summary available.",
+      thumb: String(page.thumbnail?.source || ""),
+    };
+    state.wikiPreviewCache.set(title, data);
+    return data;
+  } catch {
+    const data = { title, summary: "Preview unavailable.", thumb: "" };
+    state.wikiPreviewCache.set(title, data);
+    return data;
+  }
+}
+
+function truncateText(text, max) {
+  if (text.length <= max) return text;
+  return `${text.slice(0, Math.max(0, max - 1)).trimEnd()}...`;
+}
+
+function bindCenterTabEvents() {
+  refs.centerTabCurrent?.addEventListener("click", () => setActiveCenterPane("current", true));
+  refs.centerTabGoals?.addEventListener("click", () => setActiveCenterPane("goals", true));
+}
+
+function setActiveCenterPane(pane, persist = false) {
+  const normalized = pane === "goals" ? "goals" : "current";
+  const isCurrent = normalized === "current";
   refs.centerTabCurrent?.classList.toggle("active", isCurrent);
   refs.centerTabGoals?.classList.toggle("active", !isCurrent);
   refs.centerPaneCurrent?.classList.toggle("active", isCurrent);
   refs.centerPaneGoals?.classList.toggle("active", !isCurrent);
+  if (persist && state.profileData) {
+    if (state.profileData.centerPane !== normalized) {
+      state.profileData.centerPane = normalized;
+      persistProfile();
+    }
+  }
 }
 
 function updateCenterTabAvailability() {
@@ -146,6 +354,57 @@ function updateCenterTabAvailability() {
 function setSaveStatus(text) {
   if (!refs.saveStatus) return;
   refs.saveStatus.textContent = text;
+}
+
+function showBottomNotice(message, type = "info", durationMs = 5000) {
+  if (state.profileData?.notificationsDisabled) return;
+  state.noticeQueue.push({ message: String(message || ""), type, durationMs });
+  if (state.noticeActive) return;
+  showNextBottomNotice();
+}
+
+function showNextBottomNotice() {
+  const el = refs.bottomNotice;
+  if (!el) return;
+  if (!state.noticeQueue.length) {
+    state.noticeActive = false;
+    return;
+  }
+  state.noticeActive = true;
+  const notice = state.noticeQueue.shift();
+  if (!notice) {
+    state.noticeActive = false;
+    return;
+  }
+  if (state.noticeTimer) {
+    window.clearTimeout(state.noticeTimer);
+    state.noticeTimer = null;
+  }
+  el.textContent = notice.message;
+  el.classList.remove("error", "show");
+  if (notice.type === "error") el.classList.add("error");
+  // force reflow so repeated notices replay animation
+  void el.offsetHeight;
+  el.classList.add("show");
+  state.noticeTimer = window.setTimeout(() => {
+    el.classList.remove("show");
+    state.noticeTimer = window.setTimeout(() => {
+      state.noticeTimer = null;
+      showNextBottomNotice();
+    }, 220);
+  }, Math.max(3000, notice.durationMs));
+}
+
+function trySetStorageItem(key, value, context) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    const prefix = context ? `${context}: ` : "";
+    showBottomNotice(`${prefix}Failed to save locally. ${detail}`, "error", 4200);
+    return false;
+  }
 }
 
 async function loadChangelogFile() {
@@ -176,7 +435,7 @@ function bindTopbarEvents() {
     const selected = refs.profileSelect.value;
     if (!selected || selected === state.activeProfile) return;
     state.activeProfile = selected;
-    localStorage.setItem(`${STORAGE_PREFIX}.selectedProfile`, selected);
+    trySetStorageItem(`${STORAGE_PREFIX}.selectedProfile`, selected, "Profile selection save");
     state.profileData = loadProfileData(selected);
     renderAll();
   });
@@ -193,7 +452,7 @@ function bindTopbarEvents() {
     state.activeProfile = cleaned;
     state.profileData = createDefaultProfileData();
     saveProfileData(cleaned, state.profileData);
-    localStorage.setItem(`${STORAGE_PREFIX}.selectedProfile`, cleaned);
+    trySetStorageItem(`${STORAGE_PREFIX}.selectedProfile`, cleaned, "Profile selection save");
     hydrateProfileUI();
     renderAll();
   });
@@ -207,7 +466,7 @@ function bindTopbarEvents() {
     if (!state.profiles.includes("default")) state.profiles.unshift("default");
     saveProfiles();
     state.activeProfile = "default";
-    localStorage.setItem(`${STORAGE_PREFIX}.selectedProfile`, state.activeProfile);
+    trySetStorageItem(`${STORAGE_PREFIX}.selectedProfile`, state.activeProfile, "Profile selection save");
     state.profileData = loadProfileData(state.activeProfile);
     hydrateProfileUI();
     renderAll();
@@ -215,8 +474,39 @@ function bindTopbarEvents() {
 
   refs.virtualToggle.addEventListener("change", () => {
     state.profileData.showVirtualLevels = refs.virtualToggle.checked;
+    ensureProfileSkillState();
+    let convertedStartCount = 0;
+    let convertedEndCount = 0;
+    if (!refs.virtualToggle.checked) {
+      const activeSkill = selectedSkill();
+      if (activeSkill) {
+        const activeState = getSkillState(activeSkill.key);
+        if (convertGoalStartLevelToXpIfNeeded(activeSkill, activeState, { useUiFields: true, modeFromUi: true })) {
+          convertedStartCount += 1;
+        }
+        if (convertGoalEndLevelToXpIfNeeded(activeSkill, activeState, { useUiFields: true, modeFromUi: true })) {
+          convertedEndCount += 1;
+        }
+      }
+      for (const skill of state.skills) {
+        if (activeSkill && skill.key === activeSkill.key) continue;
+        const s = getSkillState(skill.key);
+        if (convertGoalStartLevelToXpIfNeeded(skill, s)) {
+          convertedStartCount += 1;
+        }
+        if (convertGoalEndLevelToXpIfNeeded(skill, s)) {
+          convertedEndCount += 1;
+        }
+      }
+    }
     persistProfile();
-    renderSkillsGrid();
+    renderAll();
+    if (convertedStartCount > 0 || convertedEndCount > 0) {
+      const parts = [];
+      if (convertedStartCount > 0) parts.push(`${convertedStartCount} goal start`);
+      if (convertedEndCount > 0) parts.push(`${convertedEndCount} goal end`);
+      showBottomNotice(`Virtual off: converted ${parts.join(" and ")} target(s) from Level to XP to preserve targets.`);
+    }
   });
 
   refs.importRs3Btn.addEventListener("click", async () => {
@@ -361,31 +651,66 @@ function bindTopbarEvents() {
     if (refs.changelogModal && !refs.changelogModal.hidden) refs.changelogModal.hidden = true;
     if (refs.instructionsModal && !refs.instructionsModal.hidden) refs.instructionsModal.hidden = true;
   });
+
+  refs.disableNotificationsToggle?.addEventListener("change", () => {
+    if (!state.profileData) return;
+    state.profileData.notificationsDisabled = !!refs.disableNotificationsToggle.checked;
+    if (state.profileData.notificationsDisabled) {
+      state.noticeQueue = [];
+      state.noticeActive = false;
+      if (state.noticeTimer) {
+        window.clearTimeout(state.noticeTimer);
+        state.noticeTimer = null;
+      }
+      refs.bottomNotice?.classList.remove("show", "error");
+    }
+    persistProfile();
+  });
 }
 
 function bindInputEvents() {
-  for (const el of [refs.currentLevel, refs.currentXp, refs.goalStartLevel, refs.goalStartXp, refs.goalEndLevel, refs.goalEndXp]) {
+  for (const el of [refs.currentXp, refs.goalStartLevel, refs.goalStartXp, refs.goalEndLevel, refs.goalEndXp]) {
+    if (!el) continue;
     el.addEventListener("input", () => recalcAndRender());
+    el.addEventListener("blur", () => recalcAndRender());
   }
 
-  document.querySelectorAll("input[name='currentBy'],input[name='goalStartBy'],input[name='goalEndBy']")
+  document.querySelectorAll("input[name='goalStartBy'],input[name='goalEndBy']")
     .forEach((el) => el.addEventListener("change", () => recalcAndRender()));
 
-  refs.goalTrackingEnabled.addEventListener("change", () => recalcAndRender());
+  refs.goalTrackingEnabled.addEventListener("change", () => {
+    if (refs.goalTrackingEnabled.checked) {
+      const skill = selectedSkill();
+      if (skill) {
+        const currentXp = normalizeXp(refs.currentXp.value, skill.curve.maxXp);
+        const currentLevel = skill.curve.levelForXp(currentXp);
+        const showVirtual = !!state.profileData.showVirtualLevels;
+        const effectiveMaxLevel = showVirtual ? skill.curve.maxVirtual : skill.curve.maxReal;
+        const capLevelXp = skill.curve.xpForLevel(effectiveMaxLevel);
+        const nextLevel = Math.min(effectiveMaxLevel, currentLevel + 1);
+
+        setRadio("goalStartBy", "xp");
+        refs.goalStartXp.value = String(currentXp);
+        refs.goalStartLevel.value = String(currentLevel);
+
+        if (currentXp > capLevelXp) {
+          setRadio("goalEndBy", "max");
+          refs.goalEndXp.value = String(MAX_XP);
+          showBottomNotice("Goal defaults applied: Start set to current XP, End set to MAX.");
+        } else {
+          setRadio("goalEndBy", "level");
+          refs.goalEndLevel.value = String(nextLevel);
+          refs.goalEndXp.value = String(skill.curve.xpForLevel(nextLevel));
+          showBottomNotice("Goal defaults applied: Start set to current XP, End set to next level.");
+        }
+      }
+    }
+    recalcAndRender();
+  });
 
   refs.useCurrentAsStartBtn.addEventListener("click", () => {
-    const skill = selectedSkill();
-    if (!skill) return;
-    const by = selectedRadio("currentBy");
-    if (by === "xp") {
-      setRadio("goalStartBy", "xp");
-      refs.goalStartXp.value = normalizeNonNegativeInt(refs.currentXp.value);
-      refs.goalStartLevel.value = skill.curve.levelForXp(Number(refs.goalStartXp.value || 0));
-    } else {
-      setRadio("goalStartBy", "level");
-      refs.goalStartLevel.value = normalizeLevel(refs.currentLevel.value, skill.curve.maxVirtual);
-      refs.goalStartXp.value = skill.curve.xpForLevel(Number(refs.goalStartLevel.value));
-    }
+    setRadio("goalStartBy", "xp");
+    refs.goalStartXp.value = normalizeNonNegativeInt(refs.currentXp.value);
     recalcAndRender();
   });
 }
@@ -621,6 +946,8 @@ function renderAll() {
     state.profileData.selectedSkillKey = state.selectedSkillKey;
   }
   refs.virtualToggle.checked = !!state.profileData.showVirtualLevels;
+  if (refs.disableNotificationsToggle) refs.disableNotificationsToggle.checked = !!state.profileData.notificationsDisabled;
+  setActiveCenterPane(state.profileData.centerPane === "goals" ? "goals" : "current", false);
   renderSkillsGrid();
   renderValidationPanel();
   if (!state.selectedSkillKey || !state.skillByKey.has(state.selectedSkillKey)) {
@@ -707,9 +1034,11 @@ function renderSkillsGrid() {
     const showVirtual = !!state.profileData.showVirtualLevels;
     const shownLevel = showVirtual ? evalResult.currentLevel : Math.min(evalResult.currentLevel, skill.curve.maxReal);
     const maxLevel = showVirtual ? skill.curve.maxVirtual : skill.curve.maxReal;
+    const isMaxXp = evalResult.currentXp >= MAX_XP;
 
-    button.querySelector(".skill-btn-level").textContent = `${shownLevel} / ${maxLevel}`;
-    button.querySelector(".skill-btn-xp").textContent = `${formatInt(evalResult.currentXp)} xp`;
+    button.classList.toggle("maxed", isMaxXp);
+    button.querySelector(".skill-btn-level").textContent = isMaxXp ? "MAX" : `${shownLevel} / ${maxLevel}`;
+    button.querySelector(".skill-btn-xp").textContent = isMaxXp ? "" : `${formatInt(evalResult.currentXp)} xp`;
     button.querySelector(".skill-btn-mode").textContent = skill.locked ? "[LOCKED]" : (evalResult.goalActive ? "[GOAL]" : "[NEXT]");
 
     const pct = evalResult.buttonProgress;
@@ -733,6 +1062,7 @@ function renderSkillsGrid() {
     button.addEventListener("dragstart", (event) => {
       dragFromKey = skill.key;
       button.classList.add("dragging");
+      setDraggingCursorEnabled(true);
       if (event.dataTransfer) {
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("text/plain", skill.key);
@@ -764,6 +1094,7 @@ function renderSkillsGrid() {
 
     button.addEventListener("dragend", () => {
       dragFromKey = null;
+      setDraggingCursorEnabled(false);
       refs.skillsGrid.querySelectorAll(".skill-btn.dragging,.skill-btn.drop-target")
         .forEach((el) => el.classList.remove("dragging", "drop-target"));
     });
@@ -777,28 +1108,30 @@ function renderDetail() {
   if (!skill) {
     refs.boostsWrap.innerHTML = `<div class="tab-content boosts-empty">This skill is locked.</div>`;
     refs.methodsWrap.innerHTML = `<div class="tab-content boosts-empty">This skill is locked.</div>`;
-    for (const el of [refs.currentLevel, refs.currentXp, refs.goalStartLevel, refs.goalStartXp, refs.goalEndLevel, refs.goalEndXp, refs.goalTrackingEnabled, refs.useCurrentAsStartBtn, refs.resetSkillSettingsBtn]) {
+    if (refs.methodsHeaderControls) refs.methodsHeaderControls.innerHTML = "";
+    if (refs.currentTitle) refs.currentTitle.textContent = "Current";
+    if (refs.methodsTitle) refs.methodsTitle.textContent = "Methods";
+    for (const el of [refs.currentXp, refs.goalStartLevel, refs.goalStartXp, refs.goalEndLevel, refs.goalEndXp, refs.goalTrackingEnabled, refs.useCurrentAsStartBtn, refs.resetSkillSettingsBtn]) {
       if (el) el.disabled = true;
     }
     return;
   }
   const skillState = getSkillState(skill.key);
-  if (skillState.goalTrackingEnabled) setActiveCenterPane("goals");
-  for (const el of [refs.currentLevel, refs.currentXp, refs.goalStartLevel, refs.goalStartXp, refs.goalEndLevel, refs.goalEndXp, refs.goalTrackingEnabled, refs.useCurrentAsStartBtn, refs.resetSkillSettingsBtn]) {
+  for (const el of [refs.currentXp, refs.goalStartLevel, refs.goalStartXp, refs.goalEndLevel, refs.goalEndXp, refs.goalTrackingEnabled, refs.useCurrentAsStartBtn, refs.resetSkillSettingsBtn]) {
     if (el) el.disabled = false;
   }
 
   state.suppressInput = true;
   try {
-    setRadio("currentBy", skillState.currentByXp ? "xp" : "level");
+    const showVirtual = !!state.profileData.showVirtualLevels;
+    const levelInputMax = showVirtual ? skill.curve.maxVirtual : skill.curve.maxReal;
     setRadio("goalStartBy", skillState.goalStartByXp ? "xp" : "level");
-    setRadio("goalEndBy", skillState.goalEndByXp ? "xp" : "level");
+    const goalEndMode = skillState.goalEndByMode || (skillState.goalEndByMax ? "max" : (skillState.goalEndByXp ? "xp" : "level"));
+    setRadio("goalEndBy", goalEndMode);
 
-    refs.currentLevel.max = String(skill.curve.maxVirtual);
-    refs.goalStartLevel.max = String(skill.curve.maxVirtual);
-    refs.goalEndLevel.max = String(skill.curve.maxVirtual);
+    refs.goalStartLevel.max = String(levelInputMax);
+    refs.goalEndLevel.max = String(levelInputMax);
 
-    refs.currentLevel.value = String(skillState.currentLevelInput);
     refs.currentXp.value = String(skillState.currentXp);
     refs.goalStartLevel.value = String(skillState.goalStartLevelInput);
     refs.goalStartXp.value = String(skillState.goalStartXp);
@@ -875,12 +1208,15 @@ function renderBoostTabs(skill, skillState) {
 
 function renderMethodTabs(skill, skillState) {
   refs.methodsWrap.innerHTML = "";
+  if (refs.methodsHeaderControls) refs.methodsHeaderControls.innerHTML = "";
   const allTypes = distinctTypes(skill.methods.map((m) => m.type), "Default");
-  const ordered = applySavedOrder(allTypes, skillState.methodTabOrder);
-  skillState.methodTabOrder = ordered;
+  const orderedTypes = applySavedOrder(allTypes, skillState.methodTabOrder);
+  const ordered = [...orderedTypes, METHOD_ALL_TAB_LABEL];
+  skillState.methodTabOrder = orderedTypes;
+  skillState.methodSorts = normalizeMethodSorts(skillState.methodSorts);
 
   let selected = skillState.selectedMethodTab;
-  if (!ordered.includes(selected)) selected = ordered[0] ?? "Default";
+  if (!ordered.includes(selected)) selected = orderedTypes[0] ?? METHOD_ALL_TAB_LABEL;
   skillState.selectedMethodTab = selected;
 
   const tabList = document.createElement("div");
@@ -891,11 +1227,12 @@ function renderMethodTabs(skill, skillState) {
 
   let dragFrom = null;
   for (const type of ordered) {
+    const isAllTab = type === METHOD_ALL_TAB_LABEL;
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `tab-btn${type === selected ? " active" : ""}`;
     btn.textContent = type;
-    btn.draggable = true;
+    btn.draggable = !isAllTab;
 
     btn.addEventListener("click", () => {
       skillState.selectedMethodTab = type;
@@ -904,31 +1241,90 @@ function renderMethodTabs(skill, skillState) {
       recalcAndRender();
     });
 
-    btn.addEventListener("dragstart", () => { dragFrom = type; });
-    btn.addEventListener("dragover", (e) => e.preventDefault());
-    btn.addEventListener("drop", (e) => {
-      e.preventDefault();
-      if (!dragFrom || dragFrom === type) return;
-      const list = [...skillState.methodTabOrder];
-      const from = list.indexOf(dragFrom);
-      const to = list.indexOf(type);
-      if (from < 0 || to < 0) return;
-      const moved = list.splice(from, 1)[0];
-      list.splice(to, 0, moved);
-      skillState.methodTabOrder = list;
-      persistProfile();
-      renderMethodTabs(skill, skillState);
-      recalcAndRender();
-    });
+    if (!isAllTab) {
+      btn.addEventListener("dragstart", () => {
+        dragFrom = type;
+        setDraggingCursorEnabled(true);
+      });
+      btn.addEventListener("dragover", (e) => e.preventDefault());
+      btn.addEventListener("drop", (e) => {
+        e.preventDefault();
+        if (!dragFrom || dragFrom === type) return;
+        const list = [...skillState.methodTabOrder];
+        const from = list.indexOf(dragFrom);
+        const to = list.indexOf(type);
+        if (from < 0 || to < 0) return;
+        const moved = list.splice(from, 1)[0];
+        list.splice(to, 0, moved);
+        skillState.methodTabOrder = list;
+        persistProfile();
+        renderMethodTabs(skill, skillState);
+        recalcAndRender();
+      });
+      btn.addEventListener("dragend", () => {
+        dragFrom = null;
+        setDraggingCursorEnabled(false);
+      });
+    }
 
     tabList.appendChild(btn);
   }
 
   const headerWrap = document.createElement("div");
   headerWrap.className = "method-table-header-wrap";
+  const clearSortBtn = document.createElement("button");
+  clearSortBtn.type = "button";
+  clearSortBtn.className = "method-clear-sort-btn";
+  clearSortBtn.textContent = "Clear Filters";
+  clearSortBtn.disabled = !skillState.methodSorts.length;
+  clearSortBtn.addEventListener("click", () => {
+    if (!skillState.methodSorts.length) return;
+    skillState.methodSorts = [];
+    persistProfile();
+    renderMethodTabs(skill, skillState);
+    recalcAndRender(false);
+  });
+  const resetTabsBtn = document.createElement("button");
+  resetTabsBtn.type = "button";
+  resetTabsBtn.className = "method-clear-sort-btn";
+  resetTabsBtn.textContent = "Reset Tabs";
+  const defaultOrder = distinctTypes(skill.methods.map((m) => m.type), "Default");
+  const savedOrder = Array.isArray(skillState.methodTabOrder) ? skillState.methodTabOrder : [];
+  const normalizedSaved = applySavedOrder(defaultOrder, savedOrder);
+  const isDefaultOrder = normalizedSaved.length === defaultOrder.length
+    && normalizedSaved.every((value, index) => value === defaultOrder[index]);
+  resetTabsBtn.disabled = isDefaultOrder;
+  resetTabsBtn.addEventListener("click", () => {
+    if (isDefaultOrder) return;
+    skillState.methodTabOrder = [...defaultOrder];
+    persistProfile();
+    renderMethodTabs(skill, skillState);
+    recalcAndRender(false);
+  });
+  if (refs.methodsHeaderControls) {
+    refs.methodsHeaderControls.replaceChildren(clearSortBtn, resetTabsBtn);
+  }
+
   const headerTable = document.createElement("table");
   headerTable.className = "method-table method-table-head";
-  headerTable.innerHTML = "<thead><tr><th>Action</th><th>Req Lvl</th><th>XP / Action</th><th>Actions Needed</th></tr></thead>";
+  headerTable.innerHTML = `<thead><tr>
+    ${renderMethodHeaderCell(skillState, "action", "Action")}
+    ${renderMethodHeaderCell(skillState, "requiredLevel", "Req Lvl")}
+    ${renderMethodHeaderCell(skillState, "xpPerAction", "XP / Action")}
+    ${renderMethodHeaderCell(skillState, "actionsNeeded", "Actions Needed")}
+  </tr></thead>`;
+  const headerRow = headerTable.querySelector("thead");
+  headerRow?.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const th = target?.closest("th[data-sort-key]");
+    if (!th) return;
+    const key = String(th.getAttribute("data-sort-key") || "");
+    if (!key) return;
+    cycleMethodSort(skillState, key);
+    persistProfile();
+    renderMethodTabs(skill, skillState);
+    recalcAndRender(false);
+  });
   headerWrap.appendChild(headerTable);
 
   const tableWrap = document.createElement("div");
@@ -947,51 +1343,107 @@ function recalcAndRender(refreshSkillsGrid = true) {
   if (!skill) return;
   const skillState = getSkillState(skill.key);
 
-  const currentByXp = selectedRadio("currentBy") === "xp";
-  const goalStartByXp = selectedRadio("goalStartBy") === "xp";
-  const goalEndByXp = selectedRadio("goalEndBy") === "xp";
+  const currentByXp = true;
+  let goalStartByXp = selectedRadio("goalStartBy") === "xp";
+  let goalEndMode = selectedRadio("goalEndBy");
+  let goalEndByXp = goalEndMode === "xp";
+  let goalEndByMax = goalEndMode === "max";
 
-  const currentLevelInput = normalizeLevel(refs.currentLevel.value, skill.curve.maxVirtual);
-  const goalStartLevelInput = normalizeLevel(refs.goalStartLevel.value, skill.curve.maxVirtual);
-  const goalEndLevelInput = normalizeLevel(refs.goalEndLevel.value, skill.curve.maxVirtual);
+  const showVirtual = !!state.profileData.showVirtualLevels;
+  if (!showVirtual && convertGoalStartLevelToXpIfNeeded(skill, skillState, { useUiFields: true, modeFromUi: true })) {
+    setRadio("goalStartBy", "xp");
+    goalStartByXp = true;
+  }
+  if (!showVirtual && convertGoalEndLevelToXpIfNeeded(skill, skillState, { useUiFields: true, modeFromUi: true })) {
+    setRadio("goalEndBy", "xp");
+    goalEndMode = "xp";
+    goalEndByXp = true;
+    goalEndByMax = false;
+  }
+  const effectiveMaxLevel = showVirtual ? skill.curve.maxVirtual : skill.curve.maxReal;
+  const goalStartLevelInput = normalizeLevel(refs.goalStartLevel.value, effectiveMaxLevel);
+  const goalEndLevelInput = normalizeLevel(refs.goalEndLevel.value, effectiveMaxLevel);
 
-  let currentXp = currentByXp ? normalizeXp(refs.currentXp.value, skill.curve.maxXp) : skill.curve.xpForLevel(currentLevelInput);
+  let currentXp = normalizeXp(refs.currentXp.value, skill.curve.maxXp);
   let goalStartXp = goalStartByXp ? normalizeXp(refs.goalStartXp.value, skill.curve.maxXp) : skill.curve.xpForLevel(goalStartLevelInput);
-  let goalEndXp = goalEndByXp ? normalizeXp(refs.goalEndXp.value, skill.curve.maxXp) : skill.curve.xpForLevel(goalEndLevelInput);
+  let goalEndXp = goalEndByMax
+    ? MAX_XP
+    : (goalEndByXp ? normalizeXp(refs.goalEndXp.value, skill.curve.maxXp) : skill.curve.xpForLevel(goalEndLevelInput));
   if (goalEndXp < goalStartXp) goalEndXp = goalStartXp;
 
   const currentLevel = skill.curve.levelForXp(currentXp);
   const goalStartLevel = skill.curve.levelForXp(goalStartXp);
   const goalEndLevel = skill.curve.levelForXp(goalEndXp);
+  const shownCurrentLevel = showVirtual ? currentLevel : Math.min(currentLevel, skill.curve.maxReal);
+  const shownGoalStartLevel = showVirtual ? goalStartLevel : Math.min(goalStartLevel, skill.curve.maxReal);
+  const shownGoalEndLevel = showVirtual ? goalEndLevel : Math.min(goalEndLevel, skill.curve.maxReal);
+  const nextLevel = Math.min(effectiveMaxLevel, shownCurrentLevel + 1);
 
-  const goalTrackingEnabled = refs.goalTrackingEnabled.checked;
+  const wasGoalTrackingChecked = refs.goalTrackingEnabled.checked;
+  let goalTrackingEnabled = wasGoalTrackingChecked;
+  const isCurrentMaxed = currentXp >= MAX_XP;
+  if (isCurrentMaxed) {
+    goalTrackingEnabled = false;
+    refs.goalTrackingEnabled.checked = false;
+    refs.goalTrackingEnabled.disabled = true;
+    setActiveCenterPane("current");
+    if (wasGoalTrackingChecked) {
+      showBottomNotice("Current XP is MAX. Goal tracking was disabled automatically.");
+    }
+  } else {
+    refs.goalTrackingEnabled.disabled = false;
+  }
   updateCenterTabAvailability();
   const goalStartIsSet = !goalStartByXp || String(refs.goalStartXp.value).trim() !== "";
   const goalActive = goalTrackingEnabled && goalStartIsSet && goalEndXp >= currentXp;
+  const atLevelCap = shownCurrentLevel >= effectiveMaxLevel;
+  const xpToMax = Math.max(0, MAX_XP - currentXp);
+  const nextLevelXp = atLevelCap ? currentXp : skill.curve.xpForLevel(shownCurrentLevel + 1);
+  const xpToLevel = Math.max(0, nextLevelXp - currentXp);
 
   const enabledBoosts = skill.boosts.filter((b) => skillState.enabledBoostIds.includes(boostId(b)));
   const boostMultiplier = computeBoostMultiplier(enabledBoosts);
 
-  refs.currentLevel.disabled = currentByXp;
-  refs.currentXp.disabled = !currentByXp;
+  refs.currentXp.disabled = false;
+  refs.goalStartLevel.max = String(effectiveMaxLevel);
+  refs.goalEndLevel.max = String(effectiveMaxLevel);
   refs.goalStartLevel.disabled = goalStartByXp;
   refs.goalStartXp.disabled = !goalStartByXp;
-  refs.goalEndLevel.disabled = goalEndByXp;
-  refs.goalEndXp.disabled = !goalEndByXp;
+  refs.goalEndLevel.disabled = goalEndByXp || goalEndByMax;
+  refs.goalEndXp.disabled = !goalEndByXp || goalEndByMax;
+
+  if (refs.goalStartLevelLabel) refs.goalStartLevelLabel.style.display = goalStartByXp ? "none" : "";
+  refs.goalStartLevel.style.display = goalStartByXp ? "none" : "";
+  if (refs.goalStartXpLabel) refs.goalStartXpLabel.style.display = goalStartByXp ? "" : "none";
+  refs.goalStartXp.style.display = goalStartByXp ? "" : "none";
+  if (refs.goalStartResolvedLabel) refs.goalStartResolvedLabel.textContent = goalStartByXp ? "Resolved level" : "Resolved XP";
+
+  if (refs.goalEndLevelLabel) refs.goalEndLevelLabel.style.display = goalEndByXp || goalEndByMax ? "none" : "";
+  refs.goalEndLevel.style.display = goalEndByXp || goalEndByMax ? "none" : "";
+  if (refs.goalEndXpLabel) refs.goalEndXpLabel.style.display = goalEndByXp ? "" : "none";
+  refs.goalEndXp.style.display = goalEndByXp ? "" : "none";
+  if (refs.goalEndResolvedLabel) refs.goalEndResolvedLabel.textContent = goalEndByXp ? "Resolved level" : "Resolved XP";
 
   const totalGoalXp = goalActive ? Math.max(0, goalEndXp - goalStartXp) : 0;
   const doneGoalXp = goalActive ? clamp(currentXp - goalStartXp, 0, totalGoalXp) : 0;
   const goalPercent = goalActive ? (totalGoalXp === 0 ? (currentXp >= goalEndXp ? 100 : 0) : Math.round((doneGoalXp * 100) / totalGoalXp)) : 0;
   const xpNeeded = goalActive ? Math.max(0, goalEndXp - currentXp) : 0;
+  const methodsTarget = goalEndByMax ? "MAX" : (goalActive ? "goal" : (atLevelCap ? "MAX" : "level"));
+  const methodsXpNeeded = goalEndByMax ? xpToMax : (goalActive ? xpNeeded : (atLevelCap ? xpToMax : xpToLevel));
 
   state.suppressInput = true;
   try {
-    refs.currentLevel.value = String(currentLevel);
-    refs.goalStartLevel.value = String(goalStartLevel);
-    refs.goalEndLevel.value = String(goalEndLevel);
+    const activeEl = document.activeElement;
+    const editingGoalStartLevel = activeEl === refs.goalStartLevel;
+    const editingGoalStartXp = activeEl === refs.goalStartXp;
+    const editingGoalEndLevel = activeEl === refs.goalEndLevel;
+    const editingGoalEndXp = activeEl === refs.goalEndXp;
+
+    if (!editingGoalStartLevel) refs.goalStartLevel.value = String(shownGoalStartLevel);
+    if (!editingGoalEndLevel) refs.goalEndLevel.value = String(shownGoalEndLevel);
     refs.currentXp.value = String(currentXp);
-    refs.goalStartXp.value = String(goalStartXp);
-    refs.goalEndXp.value = String(goalEndXp);
+    if (!editingGoalStartXp) refs.goalStartXp.value = String(goalStartXp);
+    if (!editingGoalEndXp) refs.goalEndXp.value = String(goalEndXp);
   } finally {
     state.suppressInput = false;
   }
@@ -1001,19 +1453,32 @@ function recalcAndRender(refreshSkillsGrid = true) {
   skillState.currentLevelInput = currentLevel;
   skillState.goalStartXp = goalStartXp;
   skillState.goalStartByXp = goalStartByXp;
-  skillState.goalStartLevelInput = goalStartLevel;
+  skillState.goalStartLevelInput = shownGoalStartLevel;
   skillState.goalStartSet = goalStartIsSet;
   skillState.goalEndXp = goalEndXp;
   skillState.goalEndByXp = goalEndByXp;
-  skillState.goalEndLevelInput = goalEndLevel;
+  skillState.goalEndByMax = goalEndByMax;
+  skillState.goalEndByMode = goalEndMode;
+  skillState.goalEndLevelInput = shownGoalEndLevel;
   skillState.goalTrackingEnabled = goalTrackingEnabled;
 
-  refs.currentResolved.textContent = `${formatInt(currentXp)} XP`;
-  refs.goalStartResolved.textContent = `${formatInt(goalStartXp)} XP`;
-  refs.goalEndResolved.textContent = `${formatInt(goalEndXp)} XP`;
-  refs.currentResolvedLevel.textContent = String(currentLevel);
-  refs.goalStartLevelResolved.textContent = String(goalStartLevel);
-  refs.goalEndLevelResolved.textContent = String(goalEndLevel);
+  refs.goalStartResolved.textContent = goalStartByXp ? String(shownGoalStartLevel) : `${formatInt(goalStartXp)} XP`;
+  refs.goalEndResolved.textContent = goalEndByXp
+    ? String(shownGoalEndLevel)
+    : (goalEndByMax ? `MAX (${formatInt(goalEndXp)} XP)` : `${formatInt(goalEndXp)} XP`);
+  refs.goalStartLevelResolved.textContent = String(shownGoalStartLevel);
+  refs.goalEndLevelResolved.textContent = goalEndByMax ? "MAX" : String(shownGoalEndLevel);
+  if (refs.currentTitle) {
+    refs.currentTitle.textContent = currentXp >= MAX_XP ? "Current (MAX)" : `Current (level ${shownCurrentLevel})`;
+  }
+  if (refs.methodsTitle) {
+    if (currentXp >= MAX_XP) {
+      refs.methodsTitle.textContent = "Methods";
+    } else {
+      const remaining = methodsXpNeeded;
+      refs.methodsTitle.textContent = `Methods (${formatInt(remaining)} xp to ${methodsTarget})`;
+    }
+  }
   refs.boostFactor.textContent = `x${boostMultiplier.toFixed(2)}`;
   refs.xpNeeded.textContent = goalActive ? formatInt(xpNeeded) : "Goal disabled / not set";
   refs.goalProgressText.textContent = goalActive
@@ -1030,8 +1495,8 @@ function recalcAndRender(refreshSkillsGrid = true) {
 
   renderMethodRows(skill, {
     currentLevel,
-    goalResolvedLevel: goalTrackingEnabled ? goalEndLevel : currentLevel,
-    xpNeeded,
+    goalResolvedLevel: goalActive ? shownGoalEndLevel : nextLevel,
+    xpNeeded: methodsXpNeeded,
     boostMultiplier,
   });
 
@@ -1040,27 +1505,142 @@ function recalcAndRender(refreshSkillsGrid = true) {
 }
 
 function renderMethodRows(skill, calc) {
+  hideWikiPreview();
   const skillState = getSkillState(skill.key);
   const selectedType = skillState.selectedMethodTab;
   const rows = [...skill.methods]
-    .filter((m) => m.type === selectedType)
-    .sort((a, b) => (a.requiredLevel - b.requiredLevel) || a.action.localeCompare(b.action));
+    .filter((m) => selectedType === METHOD_ALL_TAB_LABEL || m.type === selectedType)
+    .map((m, index) => {
+      const parsedAction = parseActionText(m.action);
+      const effectiveXp = m.xpPerAction * calc.boostMultiplier;
+      const actionsNeeded = calc.xpNeeded > 0 ? Math.ceil(calc.xpNeeded / effectiveXp) : 0;
+      return {
+        m,
+        index,
+        parsedAction,
+        actionSort: methodSortName(parsedAction.displayName),
+        requiredLevel: m.requiredLevel,
+        xpPerAction: effectiveXp,
+        actionsNeeded,
+      };
+    });
+
+  const sorts = effectiveMethodSorts(skillState);
+  if (sorts.length) {
+    rows.sort((a, b) => {
+      for (const sort of sorts) {
+        const cmp = compareMethodRow(sort.key, a, b);
+        if (cmp !== 0) return sort.dir === "asc" ? cmp : -cmp;
+      }
+      return a.index - b.index;
+    });
+  }
 
   const tbody = refs.methodsWrap.querySelector(".method-table-body tbody");
   if (!tbody) return;
   tbody.innerHTML = "";
 
-  for (const m of rows) {
+  for (const row of rows) {
+    const m = row.m;
     const tr = document.createElement("tr");
     if (m.requiredLevel <= calc.currentLevel) tr.classList.add("can-now");
     else if (m.requiredLevel <= calc.goalResolvedLevel) tr.classList.add("can-goal");
 
-    const effectiveXp = m.xpPerAction * calc.boostMultiplier;
-    const actions = calc.xpNeeded > 0 ? Math.ceil(calc.xpNeeded / effectiveXp) : 0;
-    tr.innerHTML = `<td>${escapeHtml(m.action)}</td><td>${m.requiredLevel}</td><td>${formatNumber(effectiveXp)}</td><td>${formatInt(actions)}</td>`;
+    const previewTitle = wikiActionTitle(row.parsedAction.displayName);
+    const actionHtml = row.parsedAction.linkEnabled
+      ? `<a href="${escapeHtml(wikiActionUrl(row.parsedAction.displayName))}" data-wiki-preview-title="${escapeHtml(previewTitle)}" target="_blank" rel="noopener noreferrer">${escapeHtml(row.parsedAction.displayName)}</a>`
+      : escapeHtml(row.parsedAction.displayName);
+    tr.innerHTML = `<td>${actionHtml}</td><td>${row.requiredLevel}</td><td>${formatNumber(row.xpPerAction)}</td><td>${formatInt(row.actionsNeeded)}</td>`;
     tbody.appendChild(tr);
   }
   syncMethodTableHeaderGutter();
+}
+
+function renderMethodHeaderCell(skillState, key, label) {
+  const sorts = effectiveMethodSorts(skillState);
+  const idx = sorts.findIndex((s) => s.key === key);
+  const sort = idx >= 0 ? sorts[idx] : null;
+  const marker = !sort ? "" : `${sort.dir === "asc" ? "▲" : "▼"}${idx + 1}`;
+  return `<th class="sortable${sort ? " sorted" : ""}" data-sort-key="${escapeHtml(key)}">${escapeHtml(label)}${marker ? ` <span class="sort-marker">${marker}</span>` : ""}</th>`;
+}
+
+function cycleMethodSort(skillState, key) {
+  const sorts = effectiveMethodSorts(skillState);
+  const idx = sorts.findIndex((s) => s.key === key);
+  if (idx < 0) {
+    if (sorts.length >= 2) {
+      sorts.shift();
+    }
+    sorts.push({ key, dir: "asc" });
+  } else if (sorts[idx].dir === "asc") {
+    sorts[idx].dir = "desc";
+  } else {
+    sorts.splice(idx, 1);
+  }
+  skillState.methodSorts = sorts;
+}
+
+function effectiveMethodSorts(skillState) {
+  const userSorts = normalizeMethodSorts(skillState.methodSorts);
+  if (userSorts.length) return userSorts;
+  return skillState.selectedMethodTab === METHOD_ALL_TAB_LABEL
+    ? [{ key: "requiredLevel", dir: "asc" }]
+    : [];
+}
+
+function normalizeMethodSorts(input) {
+  const validKeys = new Set(["action", "requiredLevel", "xpPerAction", "actionsNeeded"]);
+  if (!Array.isArray(input)) return [];
+  const out = [];
+  for (const raw of input) {
+    if (!raw || typeof raw !== "object") continue;
+    const key = String(raw.key || "");
+    const dir = raw.dir === "desc" ? "desc" : "asc";
+    if (!validKeys.has(key)) continue;
+    if (out.some((x) => x.key === key)) continue;
+    if (out.length >= 2) break;
+    out.push({ key, dir });
+  }
+  return out;
+}
+
+function compareMethodRow(key, a, b) {
+  if (key === "action") {
+    return a.actionSort.localeCompare(b.actionSort, undefined, { sensitivity: "base" });
+  }
+  if (key === "requiredLevel") return a.requiredLevel - b.requiredLevel;
+  if (key === "xpPerAction") return a.xpPerAction - b.xpPerAction;
+  if (key === "actionsNeeded") return a.actionsNeeded - b.actionsNeeded;
+  return 0;
+}
+
+function methodSortName(actionName) {
+  return parseActionText(actionName).displayName
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/^[^a-z0-9]+/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function parseActionText(actionName) {
+  const raw = String(actionName || "").trim();
+  if (raw.startsWith("-")) {
+    return { displayName: raw.slice(1).trim(), linkEnabled: false };
+  }
+  return { displayName: raw, linkEnabled: true };
+}
+
+function wikiActionTitle(actionName) {
+  return String(actionName || "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function wikiActionUrl(actionName) {
+  const cleaned = wikiActionTitle(actionName);
+  return `https://runescape.wiki/w/${encodeURIComponent(cleaned)}`;
 }
 
 function syncMethodTableHeaderGutter() {
@@ -1073,11 +1653,13 @@ function syncMethodTableHeaderGutter() {
 
 function evaluateSkill(skill) {
   const s = getSkillState(skill.key);
+  const showVirtual = !!state.profileData?.showVirtualLevels;
   const currentXp = clamp(s.currentXp ?? 0, 0, skill.curve.maxXp);
   const currentLevel = skill.curve.levelForXp(currentXp);
   const goalStartXp = clamp(s.goalStartXp ?? currentXp, 0, skill.curve.maxXp);
   const goalEndXp = clamp(Math.max(s.goalEndXp ?? 0, goalStartXp), 0, skill.curve.maxXp);
   const goalActive = !!s.goalTrackingEnabled && !!s.goalStartSet && goalEndXp >= currentXp;
+  const levelCap = showVirtual ? skill.curve.maxVirtual : skill.curve.maxReal;
 
   let buttonProgress = 0;
   if (goalActive) {
@@ -1085,8 +1667,10 @@ function evaluateSkill(skill) {
     const done = clamp(currentXp - goalStartXp, 0, total);
     buttonProgress = total === 0 ? (currentXp >= goalEndXp ? 1 : 0) : done / total;
   } else {
-    if (currentLevel >= skill.curve.maxVirtual) {
-      buttonProgress = 1;
+    if (currentLevel >= levelCap) {
+      const capXp = skill.curve.xpForLevel(levelCap);
+      const span = Math.max(1, MAX_XP - capXp);
+      buttonProgress = clamp((currentXp - capXp) / span, 0, 1);
     } else {
       const startXp = skill.curve.xpForLevel(currentLevel);
       const nextXp = skill.curve.xpForLevel(currentLevel + 1);
@@ -1157,7 +1741,7 @@ function defaultSkillState(skill) {
   const defaultGoalEnd = Math.min(skill.curve.maxReal, skill.curve.maxVirtual);
   return {
     currentXp: 0,
-    currentByXp: false,
+    currentByXp: true,
     currentLevelInput: 1,
     goalStartXp: 0,
     goalStartByXp: true,
@@ -1165,10 +1749,13 @@ function defaultSkillState(skill) {
     goalStartSet: false,
     goalEndXp: skill.curve.xpForLevel(defaultGoalEnd),
     goalEndByXp: false,
+    goalEndByMax: false,
+    goalEndByMode: "level",
     goalEndLevelInput: defaultGoalEnd,
     goalTrackingEnabled: false,
     enabledBoostIds: [],
     methodTabOrder: [],
+    methodSorts: [],
     selectedMethodTab: null,
     selectedBoostType: null,
   };
@@ -1197,19 +1784,29 @@ function hydrateProfileUI() {
 }
 
 function saveProfiles() {
-  localStorage.setItem(`${STORAGE_PREFIX}.profiles`, JSON.stringify(state.profiles));
-  setSaveStatus(`Saved ${new Date().toLocaleTimeString()}`);
+  if (trySetStorageItem(`${STORAGE_PREFIX}.profiles`, JSON.stringify(state.profiles), "Profiles save")) {
+    setSaveStatus(`Saved ${new Date().toLocaleTimeString()}`);
+  }
 }
 
 function loadProfileData(profileName) {
   const raw = localStorage.getItem(profileStorageKey(profileName));
   const parsed = raw ? safeJson(raw) : null;
-  return parsed && typeof parsed === "object" ? parsed : createDefaultProfileData();
+  if (!parsed || typeof parsed !== "object") return createDefaultProfileData();
+  if (parsed.centerPane !== "goals" && parsed.centerPane !== "current") {
+    parsed.centerPane = "current";
+  }
+  if (typeof parsed.notificationsDisabled !== "boolean") {
+    parsed.notificationsDisabled = false;
+  }
+  return parsed;
 }
 
 function createDefaultProfileData() {
   return {
     showVirtualLevels: false,
+    notificationsDisabled: false,
+    centerPane: "current",
     selectedSkillKey: null,
     skillOrderCustomized: false,
     skillOrder: [],
@@ -1218,14 +1815,16 @@ function createDefaultProfileData() {
 }
 
 function saveProfileData(profileName, profileData) {
-  localStorage.setItem(profileStorageKey(profileName), JSON.stringify(profileData));
-  setSaveStatus(`Saved ${new Date().toLocaleTimeString()}`);
+  if (trySetStorageItem(profileStorageKey(profileName), JSON.stringify(profileData), "Profile data save")) {
+    setSaveStatus(`Saved ${new Date().toLocaleTimeString()}`);
+  }
 }
 
 function persistProfile() {
   if (!state.activeProfile || !state.profileData) return;
-  localStorage.setItem(profileStorageKey(state.activeProfile), JSON.stringify(state.profileData));
-  setSaveStatus(`Saved ${new Date().toLocaleTimeString()}`);
+  if (trySetStorageItem(profileStorageKey(state.activeProfile), JSON.stringify(state.profileData), "Profile data save")) {
+    setSaveStatus(`Saved ${new Date().toLocaleTimeString()}`);
+  }
 }
 
 function profileStorageKey(name) {
@@ -1314,7 +1913,7 @@ async function importAppDataFromFile(file) {
   for (const [key, value] of Object.entries(entries)) {
     if (!key.startsWith(STORAGE_PREFIX)) continue;
     if (typeof value !== "string") continue;
-    localStorage.setItem(key, value);
+    trySetStorageItem(key, value, "Import save");
   }
   setSaveStatus(`Imported ${new Date().toLocaleTimeString()}`);
 }
@@ -1356,6 +1955,63 @@ function normalizeXp(value, max) {
 function normalizeNonNegativeInt(value) {
   const n = Number.parseInt(String(value || "").trim(), 10);
   return String(Math.max(0, Number.isFinite(n) ? n : 0));
+}
+
+function skillGoalStartMode(skillState) {
+  return skillState.goalStartByXp ? "xp" : "level";
+}
+
+function skillGoalEndMode(skillState) {
+  return skillState.goalEndByMode || (skillState.goalEndByMax ? "max" : (skillState.goalEndByXp ? "xp" : "level"));
+}
+
+function convertGoalStartLevelToXpIfNeeded(skill, skillState, options = {}) {
+  if (!skill || !skillState || !skillState.goalTrackingEnabled) return false;
+  const mode = options.modeFromUi ? selectedRadio("goalStartBy") : skillGoalStartMode(skillState);
+  if (mode !== "level") return false;
+
+  const useUiFields = !!options.useUiFields;
+  const rawLevel = useUiFields ? refs.goalStartLevel?.value : skillState.goalStartLevelInput;
+  const rawXp = useUiFields ? refs.goalStartXp?.value : skillState.goalStartXp;
+
+  const levelParsed = Number.parseInt(String(rawLevel ?? "").trim(), 10);
+  const xpStored = normalizeXp(rawXp, skill.curve.maxXp);
+  const levelFromXp = skill.curve.levelForXp(xpStored);
+  const goalStartLevel = clamp(Number.isFinite(levelParsed) ? levelParsed : levelFromXp, 1, skill.curve.maxVirtual);
+  const realCapXp = skill.curve.xpForLevel(skill.curve.maxReal);
+  const targetXp = Math.max(xpStored, skill.curve.xpForLevel(goalStartLevel));
+
+  if (goalStartLevel <= skill.curve.maxReal && targetXp <= realCapXp) return false;
+
+  skillState.goalStartXp = targetXp;
+  skillState.goalStartByXp = true;
+  skillState.goalStartLevelInput = Math.min(goalStartLevel, skill.curve.maxReal);
+  return true;
+}
+
+function convertGoalEndLevelToXpIfNeeded(skill, skillState, options = {}) {
+  if (!skill || !skillState || !skillState.goalTrackingEnabled) return false;
+  const mode = options.modeFromUi ? selectedRadio("goalEndBy") : skillGoalEndMode(skillState);
+  if (mode !== "level") return false;
+
+  const useUiFields = !!options.useUiFields;
+  const rawLevel = useUiFields ? refs.goalEndLevel?.value : skillState.goalEndLevelInput;
+  const rawXp = useUiFields ? refs.goalEndXp?.value : skillState.goalEndXp;
+
+  const levelParsed = Number.parseInt(String(rawLevel ?? "").trim(), 10);
+  const xpStored = normalizeXp(rawXp, skill.curve.maxXp);
+  const levelFromXp = skill.curve.levelForXp(xpStored);
+  const goalEndLevel = clamp(Number.isFinite(levelParsed) ? levelParsed : levelFromXp, 1, skill.curve.maxVirtual);
+  const realCapXp = skill.curve.xpForLevel(skill.curve.maxReal);
+  const targetXp = Math.max(xpStored, skill.curve.xpForLevel(goalEndLevel));
+
+  if (goalEndLevel <= skill.curve.maxReal && targetXp <= realCapXp) return false;
+
+  skillState.goalEndXp = targetXp;
+  skillState.goalEndByXp = true;
+  skillState.goalEndByMax = false;
+  skillState.goalEndByMode = "xp";
+  return true;
 }
 
 function computeBoostMultiplier(boosts) {
@@ -1508,7 +2164,7 @@ function decodeHtmlEntities(input) {
 function renderMarkdown(markdown) {
   const lines = String(markdown || "").replace(/\r/g, "").split("\n");
   const html = [];
-  let inList = false;
+  let listType = "";
   let inCode = false;
   let codeLang = "";
   let codeLines = [];
@@ -1520,9 +2176,9 @@ function renderMarkdown(markdown) {
     paragraph = [];
   };
   const closeList = () => {
-    if (!inList) return;
-    html.push("</ul>");
-    inList = false;
+    if (!listType) return;
+    html.push(listType === "ol" ? "</ol>" : "</ul>");
+    listType = "";
   };
   const flushCode = () => {
     if (!inCode) return;
@@ -1566,16 +2222,39 @@ function renderMarkdown(markdown) {
       continue;
     }
 
-    const listMatch = line.match(/^(\s*)-\s+(.+)$/);
-    if (listMatch) {
+    const hrMatch = line.trim().match(/^(-{3,}|\*{3,}|_{3,})$/);
+    if (hrMatch) {
       flushParagraph();
-      if (!inList) {
+      closeList();
+      html.push("<hr />");
+      continue;
+    }
+
+    const ulMatch = line.match(/^(\s*)-\s+(.+)$/);
+    if (ulMatch) {
+      flushParagraph();
+      if (listType !== "ul") {
+        closeList();
         html.push("<ul>");
-        inList = true;
+        listType = "ul";
       }
-      const indent = String(listMatch[1] || "").replace(/\t/g, "  ").length;
+      const indent = String(ulMatch[1] || "").replace(/\t/g, "  ").length;
       const depth = Math.min(4, 1 + Math.floor((indent + 1) / 2));
-      html.push(`<li class="md-depth-${depth}">${renderInlineMarkdown(listMatch[2].trim())}</li>`);
+      html.push(`<li class="md-depth-${depth}">${renderInlineMarkdown(ulMatch[2].trim())}</li>`);
+      continue;
+    }
+
+    const olMatch = line.match(/^(\s*)\d+\.\s+(.+)$/);
+    if (olMatch) {
+      flushParagraph();
+      if (listType !== "ol") {
+        closeList();
+        html.push("<ol>");
+        listType = "ol";
+      }
+      const indent = String(olMatch[1] || "").replace(/\t/g, "  ").length;
+      const depth = Math.min(4, 1 + Math.floor((indent + 1) / 2));
+      html.push(`<li class="md-depth-${depth}">${renderInlineMarkdown(olMatch[2].trim())}</li>`);
       continue;
     }
 

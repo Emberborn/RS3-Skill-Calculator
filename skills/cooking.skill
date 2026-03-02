@@ -67,15 +67,20 @@ Type: Meat
 Level: 12
 XP: 70
 
+Method: Roasted rabbit
+Type: Meat
+Level: 16
+XP: 72
+
 Method: Bacon
 Type: Meat
 Level: 14
 XP: 68
 
-Method: Roastedrabbit
+Method: Roasted beast meat
 Type: Meat
-Level: 16
-XP: 72
+Level: 21
+XP: 82
 
 Method: Spider on stick
 Type: Meat
@@ -86,11 +91,6 @@ Method: Lean snail meat
 Type: Meat
 Level: 17
 XP: 80
-
-Method: Roasted beast meat
-Type: Meat
-Level: 21
-XP: 82
 
 Method: Giant crab meat
 Type: Meat
@@ -769,4 +769,619 @@ Method: Pigswill (4)
 Type: Brewing
 Level: 64
 XP: 380
+
+Method: Pot of cream
+Type: Churning
+Level: 21
+XP: 18
+
+Method: Cream cheese
+Type: Churning
+Level: 32
+XP: 80
+
+Method: Vanilla cream cheese
+Type: Churning
+Level: 35
+XP: 90
+
+Method: Chocolate cream cheese
+Type: Churning
+Level: 35
+XP: 100
+
+Method: Pat of butter
+Type: Churning
+Level: 38
+XP: 40.5
+
+Method: Strawberry cream cheese
+Type: Churning
+Level: 45
+XP: 110
+
+Method: Cheese
+Type: Churning
+Level: 48
+XP: 23.5
+
+Method: Cheese (Scratch)
+Type: Churning
+Level: 48
+XP: 64
+
+Method: Cheese (Semi-Scratch)
+Type: Churning
+Level: 48
+XP: 46
+
+Method: Fruit Blast
+Type: Gnome Drinks
+Level: 6
+XP: 50
+
+Method: Pineapple Punch
+Type: Gnome Drinks
+Level: 8
+XP: 70
+
+Method: Wizard Blizzard
+Type: Gnome Drinks
+Level: 20
+XP: 110
+
+Method: Short Green Guy
+Type: Gnome Drinks
+Level: 20
+XP: 120
+
+Method: Drunk Dragon
+Type: Gnome Drinks
+Level: 32
+XP: 160
+
+Method: Chocolate Saturday
+Type: Gnome Drinks
+Level: 33
+XP: 170
+
+Method: Blurberry Special
+Type: Gnome Drinks
+Level: 37
+XP: 180
+
+Method: Toad crunchies
+Type: Gnome Baking
+Level: 10
+XP: 100
+
+Method: Spicy crunchies
+Type: Gnome Baking
+Level: 12
+XP: 100
+
+Method: Worm crunchies
+Type: Gnome Baking
+Level: 14
+XP: 100
+
+Method: Chocolate chip crunchies
+Type: Gnome Baking
+Level: 16
+XP: 100
+
+Method: Fruit batta
+Type: Gnome Baking
+Level: 25
+XP: 150
+
+Method: Toad batta
+Type: Gnome Baking
+Level: 26
+XP: 152
+
+Method: Worm batta
+Type: Gnome Baking
+Level: 27
+XP: 154
+
+Method: Vegetable batta
+Type: Gnome Baking
+Level: 28
+XP: 156
+
+Method: Cheese and tomato batta
+Type: Gnome Baking
+Level: 29
+XP: 158
+
+Method: Worm hole
+Type: Gnome Baking
+Level: 30
+XP: 170
+
+Method: Veg ball
+Type: Gnome Baking
+Level: 35
+XP: 175
+
+Method: Tangled toads' legs
+Type: Gnome Baking
+Level: 40
+XP: 185
+
+Method: Chocolate bomb
+Type: Gnome Baking
+Level: 42
+XP: 190
+
+Method: Primal dessert
+Type: Primal Feast
+Level: 99
+XP: 800
+
+Method: Primal main course
+Type: Primal Feast
+Level: 99
+XP: 800
+
+Method: Primal starter
+Type: Primal Feast
+Level: 99
+XP: 800
+
+Method: Primal feast
+Type: Primal Feast
+Level: 115
+XP: 1000
+
+Method: Primal feast (Scratch)
+Type: Primal Feast
+Level: 115
+XP: 30669
+
+Method: Bread
+Type: Other
+XP: 40
+
+Method: Spicy sauce
+Type: Other
+Level: 9
+XP: 25
+
+Method: Chilli con carne
+Type: Other
+Level: 11
+XP: 25
+
+Method: Scrambled egg
+Type: Other
+Level: 13
+XP: 50
+
+Method: Egg and tomato
+Type: Other
+Level: 23
+XP: 50
+
+Method: Stew
+Type: Other
+Level: 25
+XP: 117
+
+Method: Cooked sweetcorn
+Type: Other
+Level: 28
+XP: 104
+
+Method: Biscuits
+Type: Other
+Level: 32
+XP: 100
+
+Method: Biscuits (Scratch)
+Type: Other
+Level: 32
+XP: 101
+
+Method: Cake
+Type: Other
+Level: 40
+XP: 180
+
+Method: Fried onions
+Type: Other
+Level: 42
+XP: 60
+
+Method: Fried mushrooms
+Type: Other
+Level: 46
+XP: 60
+
+Method: Chocolate cake
+Type: Other
+Level: 50
+XP: 30
+
+Method: Chocolate cake (Scratch)
+Type: Other
+Level: 50
+XP: 210
+
+Method: Mushroom & onion
+Type: Other
+Level: 57
+XP: 120
+
+Method: Pitta bread
+Type: Other
+Level: 58
+XP: 40
+
+Method: Curry (Spice)
+Type: Other
+Level: 60
+XP: 280
+
+Method: Curry (Curry Leaf)
+Type: Other
+Level: 60
+XP: 280
+
+Method: Tuna and corn
+Type: Other
+Level: 67
+XP: 204
+
+Method: Edicap potato
+Type: Dungeoneering
+XP: 7.7
+
+Method: Cave potato
+Type: Dungeoneering
+XP: 9
+
+Method: Gissel potato
+Type: Dungeoneering
+XP: 12.5
+
+Method: Heim crab
+Type: Dungeoneering
+XP: 22
+
+Method: Heim crab potato
+Type: Dungeoneering
+Level: 3
+XP: 31
+
+Method: Heim crab & gissel potato
+Type: Dungeoneering
+Level: 6
+XP: 41.4
+
+Method: Heim crab & gissel potato (Scratch)
+Type: Dungeoneering
+Level: 6
+XP: 41.4
+
+Method: Heim crab & edicap potato
+Type: Dungeoneering
+Level: 9
+XP: 51.9
+
+Method: Heim crab & edicap potato (Scratch)
+Type: Dungeoneering
+Level: 9
+XP: 51.9
+
+Method: Red-eye
+Type: Dungeoneering
+Level: 10
+XP: 41
+
+Method: Red-eye potato
+Type: Dungeoneering
+Level: 13
+XP: 50
+
+Method: Red-eye & gissel potato
+Type: Dungeoneering
+Level: 16
+XP: 65.8
+
+Method: Red-eye & gissel potato (Scratch)
+Type: Dungeoneering
+Level: 16
+XP: 65.8
+
+Method: Red-eye & edicap potato
+Type: Dungeoneering
+Level: 19
+XP: 82.3
+
+Method: Red-eye & edicap potato (Scratch)
+Type: Dungeoneering
+Level: 19
+XP: 82.3
+
+Method: Dusk eel
+Type: Dungeoneering
+Level: 20
+XP: 61
+
+Method: Dusk eel potato
+Type: Dungeoneering
+Level: 23
+XP: 70
+
+Method: Dusk eel & gissel potato
+Type: Dungeoneering
+Level: 26
+XP: 91.8
+
+Method: Dusk eel & gissel potato (Scratch)
+Type: Dungeoneering
+Level: 26
+XP: 91.8
+
+Method: Dusk eel & edicap potato
+Type: Dungeoneering
+Level: 29
+XP: 114.3
+
+Method: Dusk eel & edicap potato (Scratch)
+Type: Dungeoneering
+Level: 29
+XP: 114.3
+
+Method: Giant flatfish
+Type: Dungeoneering
+Level: 30
+XP: 82
+
+Method: Flatfish potato
+Type: Dungeoneering
+Level: 33
+XP: 91
+
+Method: Flatfish & gissel potato
+Type: Dungeoneering
+Level: 36
+XP: 119.1
+
+Method: Flatfish & gissel potato (Scratch)
+Type: Dungeoneering
+Level: 36
+XP: 119.1
+
+Method: Flatfish & edicap potato
+Type: Dungeoneering
+Level: 39
+XP: 147.9
+
+Method: Flatfish & edicap potato (Scratch)
+Type: Dungeoneering
+Level: 39
+XP: 147.9
+
+Method: Short-finned eel
+Type: Dungeoneering
+Level: 40
+XP: 103
+
+Method: Short-fin potato
+Type: Dungeoneering
+Level: 43
+XP: 112
+
+Method: Short-fin & gissel potato
+Type: Dungeoneering
+Level: 46
+XP: 146.4
+
+Method: Short-fin & gissel potato (Scratch)
+Type: Dungeoneering
+Level: 46
+XP: 146.4
+
+Method: Short-fin & edicap potato
+Type: Dungeoneering
+Level: 49
+XP: 181.5
+
+Method: Short-fin & edicap potato (Scratch)
+Type: Dungeoneering
+Level: 49
+XP: 181.5
+
+Method: Web snipper
+Type: Dungeoneering
+Level: 50
+XP: 124
+
+Method: Snipper potato
+Type: Dungeoneering
+Level: 53
+XP: 133
+
+Method: Snipper & gissel potato
+Type: Dungeoneering
+Level: 56
+XP: 173.7
+
+Method: Snipper & gissel potato (Scratch)
+Type: Dungeoneering
+Level: 56
+XP: 173.7
+
+Method: Snipper & edicap potato
+Type: Dungeoneering
+Level: 59
+XP: 215.1
+
+Method: Snipper & edicap potato (Scratch)
+Type: Dungeoneering
+Level: 59
+XP: 215.1
+
+Method: Bouldabass
+Type: Dungeoneering
+Level: 60
+XP: 146
+
+Method: Bouldabass potato
+Type: Dungeoneering
+Level: 63
+XP: 155
+
+Method: Bouldabass & gissel potato
+Type: Dungeoneering
+Level: 66
+XP: 202.3
+
+Method: Bouldabass & gissel potato (Scratch)
+Type: Dungeoneering
+Level: 66
+XP: 202.3
+
+Method: Bouldabass & gissel potato
+Type: Dungeoneering
+Level: 69
+XP: 250.3
+
+Method: Bouldabass & gissel potato (Scratch)
+Type: Dungeoneering
+Level: 69
+XP: 250.3
+
+Method: Salve eel
+Type: Dungeoneering
+Level: 70
+XP: 168
+
+Method: Salve eel potato
+Type: Dungeoneering
+Level: 73
+XP: 177
+
+Method: Salve eel & gissel potato
+Type: Dungeoneering
+Level: 76
+XP: 230.9
+
+Method: Salve eel & gissel potato (Scratch)
+Type: Dungeoneering
+Level: 76
+XP: 230.9
+
+Method: Salve eel & edicap potato
+Type: Dungeoneering
+Level: 79
+XP: 285.5
+
+Method: Salve eel & edicap potato (Scratch)
+Type: Dungeoneering
+Level: 79
+XP: 285.5
+
+Method: Blue crab
+Type: Dungeoneering
+Level: 80
+XP: 191
+
+Method: Blue crab potato
+Type: Dungeoneering
+Level: 83
+XP: 200
+
+Method: Blue crab & gissel potato
+Type: Dungeoneering
+Level: 86
+XP: 260.8
+
+Method: Blue crab & gissel potato (Scratch)
+Type: Dungeoneering
+Level: 86
+XP: 260.8
+
+Method: Blue crab & gissel potato
+Type: Dungeoneering
+Level: 89
+XP: 322.3
+
+Method: Blue crab & gissel potato (Scratch)
+Type: Dungeoneering
+Level: 89
+XP: 322.3
+
+Method: Cave moray
+Type: Dungeoneering
+Level: 90
+XP: 215
+
+Method: Moray potato
+Type: Dungeoneering
+Level: 93
+XP: 224
+
+Method: Moray & gissel potato
+Type: Dungeoneering
+Level: 96
+XP: 292
+
+Method: Moray & gissel potato (Scratch)
+Type: Dungeoneering
+Level: 96
+XP: 292
+
+Method: Moray & edicap potato
+Type: Dungeoneering
+Level: 99
+XP: 360.7
+
+Method: Moray & edicap potato (Scratch)
+Type: Dungeoneering
+Level: 99
+XP: 360.7
+
+Method: Cracked cooking urn
+Type: Urns
+XP: 2400
+
+Method: Cracked cooking urn (Urn Enhancer)
+Type: Urns
+XP: 2500
+
+Method: Fragile cooking urn
+Type: Urns
+XP: 3300
+
+Method: Fragile cooking urn (Urn Enhancer)
+Type: Urns
+XP: 3437.5
+
+Method: Plain cooking urn
+Type: Urns
+XP: 5700
+
+Method: Plain cooking urn (Urn Enhancer)
+Type: Urns
+XP: 5937.5
+
+Method: Strong cooking urn
+Type: Urns
+XP: 6300
+
+Method: Strong cooking urn (Urn Enhancer)
+Type: Urns
+XP: 6562.5
+
+Method: Decorated cooking urn
+Type: Urns
+XP: 9285
+
+Method: Decorated cooking urn (Urn Enhancer)
+Type: Urns
+XP: 9671.9
 
