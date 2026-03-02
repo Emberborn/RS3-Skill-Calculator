@@ -755,7 +755,7 @@ function parseSkillFile(fileName, text) {
 
   let block = "";
   let method = { name: "", type: "Default", level: 1, xp: null };
-  let boost = { name: "", type: "General", xpPercent: null, xpMultiplier: null };
+  let boost = { name: "", type: "General", xpPercent: null, xpMultiplier: null, xpFlat: null, disables: [] };
 
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
@@ -787,14 +787,14 @@ function parseSkillFile(fileName, text) {
       if (block === "boost") finalizeBoost(boosts, boost, issues, lineNo);
       block = "method";
       method = { name: line.slice(7).trim(), type: "Default", level: 1, xp: null };
-      boost = { name: "", type: "General", xpPercent: null, xpMultiplier: null };
+      boost = { name: "", type: "General", xpPercent: null, xpMultiplier: null, xpFlat: null, disables: [] };
       continue;
     }
     if (lower.startsWith("boost:")) {
       if (block === "method") finalizeMethod(methods, method, issues, lineNo);
       finalizeBoost(boosts, boost, issues, lineNo);
       block = "boost";
-      boost = { name: line.slice(6).trim(), type: "General", xpPercent: null, xpMultiplier: null };
+      boost = { name: line.slice(6).trim(), type: "General", xpPercent: null, xpMultiplier: null, xpFlat: null, disables: [] };
       method = { name: "", type: "Default", level: 1, xp: null };
       continue;
     }
@@ -833,6 +833,24 @@ function parseSkillFile(fileName, text) {
       const n = Number.parseFloat(line.slice(14).trim());
       if (Number.isFinite(n)) boost.xpMultiplier = n;
       else issues.push({ line: lineNo, message: "Invalid XP-Multiplier value." });
+      continue;
+    }
+    if (lower.startsWith("xp-flat:")) {
+      if (block !== "boost") {
+        issues.push({ line: lineNo, message: "XP-Flat is outside a Boost block." });
+        continue;
+      }
+      const n = Number.parseFloat(line.slice(8).trim());
+      if (Number.isFinite(n)) boost.xpFlat = n;
+      else issues.push({ line: lineNo, message: "Invalid XP-Flat value." });
+      continue;
+    }
+    if (lower.startsWith("disables:")) {
+      if (block !== "boost") {
+        issues.push({ line: lineNo, message: "Disables is outside a Boost block." });
+        continue;
+      }
+      boost.disables = parseBoostDisableList(line.slice(9));
       continue;
     }
     if (lower.startsWith("xp:")) {
@@ -877,11 +895,18 @@ function finalizeMethod(methods, m, issues, lineNo) {
 
 function finalizeBoost(boosts, b, issues, lineNo) {
   if (!b.name) return;
-  if (!Number.isFinite(b.xpPercent) && !Number.isFinite(b.xpMultiplier)) {
-    issues.push({ line: lineNo, message: `Boost '${b.name}' needs XP-Percent or XP-Multiplier.` });
+  if (!Number.isFinite(b.xpPercent) && !Number.isFinite(b.xpMultiplier) && !Number.isFinite(b.xpFlat)) {
+    issues.push({ line: lineNo, message: `Boost '${b.name}' needs XP-Percent, XP-Multiplier, or XP-Flat.` });
     return;
   }
-  boosts.push({ name: b.name, type: b.type || "General", xpPercent: numOrNull(b.xpPercent), xpMultiplier: numOrNull(b.xpMultiplier) });
+  boosts.push({
+    name: b.name,
+    type: b.type || "General",
+    xpPercent: numOrNull(b.xpPercent),
+    xpMultiplier: numOrNull(b.xpMultiplier),
+    xpFlat: numOrNull(b.xpFlat),
+    disables: Array.isArray(b.disables) ? b.disables : [],
+  });
 }
 
 function numOrNull(v) { return Number.isFinite(v) ? v : null; }
@@ -1192,11 +1217,15 @@ function renderBoostTabs(skill, skillState) {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = skillState.enabledBoostIds.includes(id);
+    const disabler = activeBoostDisablerFor(skill, skillState, boost);
+    if (disabler && !checkbox.checked) {
+      checkbox.disabled = true;
+      label.title = `Disabled by ${disabler.name}`;
+    }
     checkbox.addEventListener("change", () => {
-      if (checkbox.checked) skillState.enabledBoostIds.push(id);
-      else skillState.enabledBoostIds = skillState.enabledBoostIds.filter((x) => x !== id);
-      skillState.enabledBoostIds = [...new Set(skillState.enabledBoostIds)];
+      applyBoostSelection(skill, skillState, boost, checkbox.checked);
       persistProfile();
+      renderBoostTabs(skill, skillState);
       recalcAndRender();
       renderSkillsGrid();
     });
@@ -1402,7 +1431,9 @@ function recalcAndRender(refreshSkillsGrid = true) {
   const xpToLevel = Math.max(0, nextLevelXp - currentXp);
 
   const enabledBoosts = skill.boosts.filter((b) => skillState.enabledBoostIds.includes(boostId(b)));
-  const boostMultiplier = computeBoostMultiplier(enabledBoosts);
+  const boostEffects = computeBoostEffects(enabledBoosts);
+  const boostMultiplier = boostEffects.multiplier;
+  const boostFlatXp = boostEffects.flatXp;
 
   refs.currentXp.disabled = false;
   refs.goalStartLevel.max = String(effectiveMaxLevel);
@@ -1479,7 +1510,9 @@ function recalcAndRender(refreshSkillsGrid = true) {
       refs.methodsTitle.textContent = `Methods (${formatInt(remaining)} xp to ${methodsTarget})`;
     }
   }
-  refs.boostFactor.textContent = `x${boostMultiplier.toFixed(2)}`;
+  refs.boostFactor.textContent = boostFlatXp !== 0
+    ? `x${boostMultiplier.toFixed(2)} (+${formatNumber(boostFlatXp)} xp)`
+    : `x${boostMultiplier.toFixed(2)}`;
   refs.xpNeeded.textContent = goalActive ? formatInt(xpNeeded) : "Goal disabled / not set";
   refs.goalProgressText.textContent = goalActive
     ? `${goalPercent}% (${formatInt(doneGoalXp)} / ${formatInt(totalGoalXp)} XP)`
@@ -1498,6 +1531,7 @@ function recalcAndRender(refreshSkillsGrid = true) {
     goalResolvedLevel: goalActive ? shownGoalEndLevel : nextLevel,
     xpNeeded: methodsXpNeeded,
     boostMultiplier,
+    boostFlatXp,
   });
 
   persistProfile();
@@ -1512,7 +1546,7 @@ function renderMethodRows(skill, calc) {
     .filter((m) => selectedType === METHOD_ALL_TAB_LABEL || m.type === selectedType)
     .map((m, index) => {
       const parsedAction = parseActionText(m.action);
-      const effectiveXp = m.xpPerAction * calc.boostMultiplier;
+      const effectiveXp = (m.xpPerAction * calc.boostMultiplier) + (calc.boostFlatXp || 0);
       const actionsNeeded = calc.xpNeeded > 0 ? Math.ceil(calc.xpNeeded / effectiveXp) : 0;
       return {
         m,
@@ -2014,25 +2048,89 @@ function convertGoalEndLevelToXpIfNeeded(skill, skillState, options = {}) {
   return true;
 }
 
-function computeBoostMultiplier(boosts) {
+function computeBoostEffects(boosts) {
   let percent = 0;
   let multi = 1;
+  let flatXp = 0;
   for (const b of boosts) {
     if (Number.isFinite(b.xpPercent)) percent += b.xpPercent;
     if (Number.isFinite(b.xpMultiplier)) multi *= b.xpMultiplier;
+    if (Number.isFinite(b.xpFlat)) flatXp += b.xpFlat;
   }
-  return multi * (1 + percent / 100);
+  return {
+    multiplier: multi * (1 + percent / 100),
+    flatXp,
+  };
 }
 
 function boostLabel(boost) {
   const parts = [];
   if (Number.isFinite(boost.xpPercent)) parts.push(`+${formatNumber(boost.xpPercent)}%`);
   if (Number.isFinite(boost.xpMultiplier)) parts.push(`x${formatNumber(boost.xpMultiplier)}`);
+  if (Number.isFinite(boost.xpFlat)) parts.push(`+${formatNumber(boost.xpFlat)} xp`);
   return parts.length ? `${boost.name} (${parts.join(", ")})` : boost.name;
 }
 
 function boostId(boost) {
   return `${boost.type}|${boost.name}`;
+}
+
+function parseBoostDisableList(raw) {
+  return String(raw || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+function normalizeBoostDisableToken(token) {
+  return String(token || "").trim().toLowerCase();
+}
+
+function boostMatchesDisableToken(boost, token) {
+  const t = normalizeBoostDisableToken(token);
+  if (!t) return false;
+  const byName = normalizeBoostDisableToken(boost.name);
+  const byFull = normalizeBoostDisableToken(`${boost.type}|${boost.name}`);
+  return t === byName || t === byFull;
+}
+
+function disabledBoostIdsForBoost(skill, boost) {
+  const tokens = Array.isArray(boost.disables) ? boost.disables : [];
+  if (!tokens.length) return [];
+  const ids = [];
+  for (const target of skill.boosts) {
+    if (target === boost) continue;
+    if (tokens.some((token) => boostMatchesDisableToken(target, token))) {
+      ids.push(boostId(target));
+    }
+  }
+  return ids;
+}
+
+function activeBoostDisablerFor(skill, skillState, boost) {
+  const id = boostId(boost);
+  const enabled = new Set(skillState.enabledBoostIds || []);
+  for (const candidate of skill.boosts) {
+    const candidateId = boostId(candidate);
+    if (!enabled.has(candidateId) || candidateId === id) continue;
+    const disabledIds = disabledBoostIdsForBoost(skill, candidate);
+    if (disabledIds.includes(id)) return candidate;
+  }
+  return null;
+}
+
+function applyBoostSelection(skill, skillState, boost, checked) {
+  const id = boostId(boost);
+  const enabled = new Set(skillState.enabledBoostIds || []);
+  if (checked) {
+    enabled.add(id);
+    for (const blockedId of disabledBoostIdsForBoost(skill, boost)) {
+      enabled.delete(blockedId);
+    }
+  } else {
+    enabled.delete(id);
+  }
+  skillState.enabledBoostIds = [...enabled];
 }
 
 function distinctTypes(items, preferredFirst) {
