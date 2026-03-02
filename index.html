@@ -4,15 +4,22 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>RuneScape Skill Calculator (Web)</title>
+  <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <header class="topbar">
-    <div class="topbar-group topbar-left">
-      <button id="exportDataBtn" type="button">Export Data</button>
-      <button id="importDataBtn" type="button">Import Data</button>
-      <button id="resetAllDataBtn" type="button">Reset All Data</button>
-      <input id="importDataFile" type="file" accept="application/json,.json" hidden />
+    <div class="topbar-left-stack">
+      <div class="app-brand" aria-label="RS Skill Calculator">
+        <img class="app-brand-logo" src="./assets/logo.svg" alt="" />
+        <span class="app-brand-text">RS3 Skill Calculator</span>
+      </div>
+      <div class="topbar-group topbar-left">
+        <button id="exportDataBtn" type="button">Export Data</button>
+        <button id="importDataBtn" type="button">Import Data</button>
+        <button id="resetAllDataBtn" type="button">Reset All Data</button>
+        <input id="importDataFile" type="file" accept="application/json,.json" hidden />
+      </div>
     </div>
     <div class="topbar-group topbar-center">
       <label for="profileSelect">Profile</label>
@@ -45,21 +52,10 @@
 
         <div id="centerPaneCurrent" class="detail-left-pane active">
           <section class="card" id="currentCard">
-            <h3>Current</h3>
+            <h3 id="currentTitle">Current</h3>
             <div class="field-grid">
-              <label>Current by</label>
-              <div class="radio-row">
-                <label><input type="radio" name="currentBy" value="level" checked /> Level</label>
-                <label><input type="radio" name="currentBy" value="xp" /> XP</label>
-              </div>
-              <label for="currentLevel">Current level</label>
-              <input id="currentLevel" type="number" min="1" step="1" />
               <label for="currentXp">Current XP</label>
               <input id="currentXp" type="number" min="0" step="1" />
-              <label>Current resolved</label>
-              <div id="currentResolved" class="value">0 XP</div>
-              <label>Level (from XP)</label>
-              <div id="currentResolvedLevel" class="value">1</div>
               <label>Boost factor</label>
               <div id="boostFactor" class="value">x1.00</div>
               <label>Goal tracking</label>
@@ -84,11 +80,11 @@
                 <label><input type="radio" name="goalStartBy" value="level" /> Level</label>
                 <label><input type="radio" name="goalStartBy" value="xp" checked /> XP</label>
               </div>
-              <label for="goalStartLevel">Goal start level</label>
+              <label id="goalStartLevelLabel" for="goalStartLevel">Goal start level</label>
               <input id="goalStartLevel" type="number" min="1" step="1" />
-              <label for="goalStartXp">Goal start XP</label>
+              <label id="goalStartXpLabel" for="goalStartXp">Goal start XP</label>
               <input id="goalStartXp" type="number" min="0" step="1" />
-              <label>Resolved</label>
+              <label id="goalStartResolvedLabel">Resolved XP</label>
               <div id="goalStartResolved" class="value">0 XP</div>
               <span></span>
               <button id="useCurrentAsStartBtn" type="button">Use Current as Goal Start</button>
@@ -102,12 +98,13 @@
               <div class="radio-row">
                 <label><input type="radio" name="goalEndBy" value="level" checked /> Level</label>
                 <label><input type="radio" name="goalEndBy" value="xp" /> XP</label>
+                <label><input type="radio" name="goalEndBy" value="max" /> MAX</label>
               </div>
-              <label for="goalEndLevel">Goal end level</label>
+              <label id="goalEndLevelLabel" for="goalEndLevel">Goal end level</label>
               <input id="goalEndLevel" type="number" min="1" step="1" />
-              <label for="goalEndXp">Goal end XP</label>
+              <label id="goalEndXpLabel" for="goalEndXp">Goal end XP</label>
               <input id="goalEndXp" type="number" min="0" step="1" />
-              <label>Resolved</label>
+              <label id="goalEndResolvedLabel">Resolved XP</label>
               <div id="goalEndResolved" class="value">0 XP</div>
             </div>
           </section>
@@ -132,7 +129,10 @@
       </div>
 
       <div class="detail-right card">
-        <h3>Methods</h3>
+        <div class="methods-card-head">
+          <h3 id="methodsTitle">Methods</h3>
+          <div id="methodsHeaderControls" class="methods-header-controls"></div>
+        </div>
         <div id="methodsWrap" class="side-tabs methods-wrap"></div>
       </div>
     </section>
@@ -142,9 +142,12 @@
       <button id="aboutBtn" type="button">Version</button>
       <button id="instructionsBtn" type="button">Instructions</button>
       <button id="reportIssueBtn" type="button">Report Issue</button>
+      <label class="notify-toggle"><input id="disableNotificationsToggle" type="checkbox" /> disabled notification</label>
     </div>
     <div class="footer-info">RuneScape Skill Calculator Web | Created by EmberOfAshes | MIT License</div>
   </footer>
+  <div id="bottomNotice" class="bottom-notice" aria-live="polite" aria-atomic="true"></div>
+  <div id="wikiPreview" class="wiki-preview" hidden aria-hidden="true"></div>
   <div id="changelogModal" class="modal" hidden>
     <div class="modal-backdrop" id="changelogBackdrop"></div>
     <div class="modal-card">

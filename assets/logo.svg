@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="RS3 Skill Calculator logo">
+  <defs>
+    <linearGradient id="bg64" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4a3727"/>
+      <stop offset="100%" stop-color="#2b2017"/>
+    </linearGradient>
+    <linearGradient id="ring64" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e1bf7f"/>
+      <stop offset="100%" stop-color="#9f7a4d"/>
+    </linearGradient>
+    <radialGradient id="core64" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#5fd1b8"/>
+      <stop offset="100%" stop-color="#1e7a66"/>
+    </radialGradient>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="13" fill="url(#bg64)" stroke="#715536" stroke-width="2"/>
+  <circle cx="32" cy="32" r="19" fill="none" stroke="url(#ring64)" stroke-width="4"/>
+  <circle cx="32" cy="32" r="9" fill="url(#core64)" stroke="#c7a56d" stroke-width="1.5"/>
+  <path d="M32 10v6M32 48v6M10 32h6M48 32h6M16.2 16.2l4.2 4.2M43.6 43.6l4.2 4.2M47.8 16.2l-4.2 4.2M20.4 43.6l-4.2 4.2" stroke="#d8b274" stroke-width="2" stroke-linecap="round"/>
+</svg>
