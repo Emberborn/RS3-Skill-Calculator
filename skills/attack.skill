@@ -12,6 +12,8 @@
 # Type: <any group name> (optional, default General)
 # XP-Percent: <percent> (optional, at least one XP field required)
 # XP-Multiplier: <multiplier> (optional, at least one XP field required)
+# XP-Flat: <flat-xp> (optional, at least one XP field required)
+# Disables: <boost-name or type|boost-name, ...> (optional)
 
 Curve: standard
 
