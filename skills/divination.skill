@@ -15,3 +15,74 @@
 
 Curve: standard
 
+Boost: Boon of flickering energy
+Type: Boons
+XP-Percent: 10
+Apply-Type: Conversion, Conversion with energy, Conversion /w Energy
+Apply-Action: Flickering memory
+
+Boost: Boon of bright energy
+Type: Boons
+XP-Percent: 10
+Apply-Type: Conversion, Conversion with energy, Conversion /w Energy
+Apply-Action: Bright memory
+
+Boost: Boon of glowing energy
+Type: Boons
+XP-Percent: 10
+Apply-Type: Conversion, Conversion with energy, Conversion /w Energy
+Apply-Action: Glowing memory
+
+Boost: Boon of sparkling energy
+Type: Boons
+XP-Percent: 10
+Apply-Type: Conversion, Conversion with energy, Conversion /w Energy
+Apply-Action: Sparkling memory
+
+Boost: Boon of gleaming energy
+Type: Boons
+XP-Percent: 10
+Apply-Type: Conversion, Conversion with energy, Conversion /w Energy
+Apply-Action: Gleaming memory
+
+Boost: Boon of vibrant energy
+Type: Boons
+XP-Percent: 10
+Apply-Type: Conversion, Conversion with energy, Conversion /w Energy
+Apply-Action: Vibrant memory
+
+Boost: Boon of lustrous energy
+Type: Boons
+XP-Percent: 10
+Apply-Type: Conversion, Conversion with energy, Conversion /w Energy
+Apply-Action: Lustrous memory
+
+Boost: Boon of elder energy
+Type: Boons
+XP-Percent: 10
+Apply-Type: Conversion, Conversion with energy, Conversion /w Energy
+Apply-Action: Elder memory
+
+Boost: Boon of brilliant energy
+Type: Boons
+XP-Percent: 10
+Apply-Type: Conversion, Conversion with energy, Conversion /w Energy
+Apply-Action: Brilliant memory
+
+Boost: Boon of radiant energy
+Type: Boons
+XP-Percent: 10
+Apply-Type: Conversion, Conversion with energy, Conversion /w Energy
+Apply-Action: Radiant memory
+
+Boost: Boon of luminous energy
+Type: Boons
+XP-Percent: 10
+Apply-Type: Conversion, Conversion with energy, Conversion /w Energy
+Apply-Action: Luminous memory
+
+Boost: Boon of incandescent energy
+Type: Boons
+XP-Percent: 10
+Apply-Type: Conversion, Conversion with energy, Conversion /w Energy
+Apply-Action: Incandescent memory

@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.4.9] - 2026-03-02
+
+### Added
+- Wiki import failure visibility and recovery:
+  - Skills that fail wiki method import now show `[DATA ERR]`
+  - Skills header now shows active data error count
+  - Failed skill buttons include error/next-retry tooltip
+  - Clicking a failed skill triggers an immediate retry
+  - Automatic background retry with exponential backoff
+
+### Changed
+- Method data source migration:
+  - `.skill` files are now treated as boost/config sources
+  - Method rows are sourced from wiki module imports for enabled skills
+- Methods tabs and sorting:
+  - Removed synthetic `All` tab
+  - Default method sort is now `Req Lvl` across method tabs
+- Boost targeting:
+  - Added `Apply-Type` and `Apply-Action` support for boosts
+  - Targeted boosts now apply per matching method row only
+  - Boost factor display shows `Varies by method` when targeted boosts are active
+- Wiki parsing and import reliability:
+  - Improved train-method parsing for `if/elseif` branch modules
+  - Added support for branch-local `methods = { ... }` tables
+  - Added support for local table returns (`return <TableName>`)
+  - Added Lua comment stripping and comma-number parsing to prevent dropped imports
+
+### Skill-Specific
+- Invention:
+  - Wiki links for `Disassembling`/`Siphoning` method types now open:
+    - `https://runescape.wiki/w/Calculator:Equipment_experience_by_tier`
+- Slayer:
+  - Imported methods now use `requiredLevel = 1` for row coloring
+  - Creature level is appended to method names as `(CB: N)`
+- Divination:
+  - Added boon boost entries with targeted application to matching conversion methods
+
+---
+
 ## [1.4.8] - 2026-03-02
 
 ### Boosts

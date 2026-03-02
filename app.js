@@ -1,10 +1,12 @@
 const STORAGE_PREFIX = "rscalc.web.v1";
 const CHANGELOG_FILE = "./CHANGELOG.md";
 const INSTRUCTIONS_FILE = "./INSTRUCTIONS.md";
+const SKILL_METHOD_TRANSFORMS_FILE = "./skill-method-transforms.txt";
 const REPORT_ISSUE_URL = typeof window !== "undefined" ? String(window.REPORT_ISSUE_URL || "").trim() : "";
 const MAX_XP = 200_000_000;
 const REAL_MAX_LEVEL = 120;
-const METHOD_ALL_TAB_LABEL = "All";
+const SKILL_IMPORT_RETRY_BASE_MS = 30_000;
+const SKILL_IMPORT_RETRY_MAX_MS = 10 * 60_000;
 const WEB_BASE_URL = new URL(".", import.meta.url);
 const APP_ROOT_URL = new URL("../", import.meta.url);
 const RS3_SKILL_ORDER = [
@@ -20,6 +22,30 @@ const FIXED_SKILL_ORDER = [
   "runecrafting", "slayer", "farming", "construction", "hunter", "summoning", "dungeoneering",
   "divination", "invention", "archaeology", "necromancy"
 ];
+const WIKI_METHOD_IMPORT_SKILLS = new Set([
+  "agility",
+  "archaeology",
+  "construction",
+  "cooking",
+  "crafting",
+  "divination",
+  "farming",
+  "firemaking",
+  "fishing",
+  "fletching",
+  "herblore",
+  "hunter",
+  "invention",
+  "magic",
+  "mining",
+  "prayer",
+  "runecrafting",
+  "slayer",
+  "smithing",
+  "summoning",
+  "thieving",
+  "woodcutting",
+]);
 
 const refs = {
   profileSelect: document.getElementById("profileSelect"),
@@ -51,6 +77,7 @@ const refs = {
   wikiPreview: document.getElementById("wikiPreview"),
   validationCard: document.getElementById("validationCard"),
   validationList: document.getElementById("validationList"),
+  skillsHeaderTitle: document.querySelector(".skills-panel .panel-header h2"),
   virtualToggle: document.getElementById("virtualToggle"),
   skillsGrid: document.getElementById("skillsGrid"),
   boostsWrap: document.getElementById("boostsWrap"),
@@ -108,6 +135,8 @@ const state = {
   wikiPreviewTimer: null,
   wikiPreviewTargetTitle: null,
   wikiPreviewRequestId: 0,
+  skillImportStatusByKey: new Map(),
+  skillImportRetryTimers: new Map(),
 };
 
 const numberFormat = new Intl.NumberFormat("en-US");
@@ -740,7 +769,680 @@ async function loadSkills() {
       state.validationIssues.push({ scope: fileName, line: issue.line, message: issue.message });
     }
   }
+  await importWikiMethodsIntoSkills(skills);
   return skills;
+}
+
+async function importWikiMethodsIntoSkills(skills) {
+  if (!Array.isArray(skills) || skills.length === 0) return;
+  const transformRules = await loadSkillMethodTransforms();
+  const targets = skills.filter((skill) => WIKI_METHOD_IMPORT_SKILLS.has(normalizeKey(skill.name)));
+  if (!targets.length) return;
+
+  await Promise.all(targets.map((skill) => importWikiMethodsForSkill(skill, transformRules)));
+}
+
+function withCombatLevelSuffix(action, combatLevel) {
+  const base = String(action || "").trim();
+  if (!base) return base;
+  if (!Number.isFinite(combatLevel) || combatLevel <= 0) return base;
+  if (/\(CB:\s*\d+\)\s*$/i.test(base)) return base;
+  return `${base} (CB: ${combatLevel})`;
+}
+
+function getSkillImportStatus(skillKey) {
+  return state.skillImportStatusByKey.get(skillKey) || null;
+}
+
+function setSkillImportStatus(skillKey, statusPatch) {
+  const prev = getSkillImportStatus(skillKey) || {};
+  const next = {
+    status: String(statusPatch.status || prev.status || "idle"),
+    error: statusPatch.error != null ? String(statusPatch.error) : String(prev.error || ""),
+    attempts: Number.isFinite(statusPatch.attempts) ? statusPatch.attempts : (Number.isFinite(prev.attempts) ? prev.attempts : 0),
+    failedAt: Number.isFinite(statusPatch.failedAt) ? statusPatch.failedAt : (Number.isFinite(prev.failedAt) ? prev.failedAt : null),
+    nextRetryAt: Number.isFinite(statusPatch.nextRetryAt) ? statusPatch.nextRetryAt : (Number.isFinite(prev.nextRetryAt) ? prev.nextRetryAt : null),
+  };
+  state.skillImportStatusByKey.set(skillKey, next);
+}
+
+function clearSkillImportRetry(skillKey) {
+  const timer = state.skillImportRetryTimers.get(skillKey);
+  if (timer) window.clearTimeout(timer);
+  state.skillImportRetryTimers.delete(skillKey);
+}
+
+function scheduleSkillImportRetry(skill, reason) {
+  if (!skill?.key) return;
+  const current = getSkillImportStatus(skill.key);
+  const attempts = Math.max(1, (Number.isFinite(current?.attempts) ? current.attempts : 0) + 1);
+  const delay = Math.min(SKILL_IMPORT_RETRY_MAX_MS, SKILL_IMPORT_RETRY_BASE_MS * Math.pow(2, attempts - 1));
+  const nextRetryAt = Date.now() + delay;
+  setSkillImportStatus(skill.key, {
+    status: "failed",
+    error: reason,
+    attempts,
+    failedAt: Date.now(),
+    nextRetryAt,
+  });
+  clearSkillImportRetry(skill.key);
+  const timer = window.setTimeout(() => {
+    state.skillImportRetryTimers.delete(skill.key);
+    void retrySkillImportByKey(skill.key);
+  }, delay);
+  state.skillImportRetryTimers.set(skill.key, timer);
+}
+
+async function retrySkillImportByKey(skillKey) {
+  const skill = state.skillByKey.get(skillKey) || state.skills.find((s) => s.key === skillKey) || null;
+  if (!skill || !WIKI_METHOD_IMPORT_SKILLS.has(normalizeKey(skill.name))) return false;
+  const rules = await loadSkillMethodTransforms();
+  const ok = await importWikiMethodsForSkill(skill, rules, true);
+  renderSkillsGrid();
+  if (skill.key === state.selectedSkillKey) renderDetail();
+  return ok;
+}
+
+async function importWikiMethodsForSkill(skill, transformRules, isRetry = false) {
+  if (!skill?.key) return false;
+  setSkillImportStatus(skill.key, { status: "pending" });
+  try {
+    const rows = await fetchWikiMethodsForSkill(skill.name);
+    if (!rows.length) throw new Error("No method rows returned from wiki module.");
+    const transformed = applyMethodTransformRules(rows, skill.name, transformRules);
+    const skillKey = normalizeKey(skill.name);
+    const methods = transformed
+      .map((row) => {
+        const combatOrReqLevel = Number.parseInt(String(row.level ?? "").replace(/,/g, ""), 10);
+        const isSlayer = skillKey === "slayer";
+        const baseAction = String(row.method || "").trim();
+        return {
+          action: isSlayer ? withCombatLevelSuffix(baseAction, combatOrReqLevel) : baseAction,
+          type: String(row.type || "Default").trim() || "Default",
+          requiredLevel: isSlayer ? 1 : Math.max(1, combatOrReqLevel || 1),
+          xpPerAction: Number.parseFloat(row.xp),
+        };
+      })
+      .filter((m) => m.action && Number.isFinite(m.xpPerAction) && m.xpPerAction > 0);
+    if (!methods.length) throw new Error("No valid methods after parsing/transforms.");
+    skill.methods = methods;
+    skill.locked = false;
+    clearSkillImportRetry(skill.key);
+    setSkillImportStatus(skill.key, { status: "ok", error: "", nextRetryAt: null });
+    if (isRetry) showBottomNotice(`${skill.name} data refreshed successfully.`);
+    return true;
+  } catch (err) {
+    const reason = String(err?.message || err || "Unknown import error");
+    debugLog("warn", `Wiki method import failed for ${skill.name}: ${reason}`);
+    scheduleSkillImportRetry(skill, reason);
+    return false;
+  }
+}
+
+async function loadSkillMethodTransforms() {
+  const text = await fetchTextWithFallback([
+    new URL(SKILL_METHOD_TRANSFORMS_FILE, WEB_BASE_URL).href,
+    new URL(SKILL_METHOD_TRANSFORMS_FILE, APP_ROOT_URL).href,
+    "/skill-method-transforms.txt",
+  ]);
+  if (!text) return [];
+  const blocks = text.split(/\r?\n\s*\r?\n/);
+  const rules = [];
+  for (const block of blocks) {
+    const fields = {};
+    for (const rawLine of block.split(/\r?\n/)) {
+      const line = rawLine.trim().replace(/^\uFEFF/, "");
+      if (!line || line.startsWith("#")) continue;
+      const idx = line.indexOf(":");
+      if (idx < 0) continue;
+      const key = line.slice(0, idx).trim().toLowerCase();
+      const value = line.slice(idx + 1).trim();
+      fields[key] = value;
+    }
+    const skill = String(fields.skill || "").trim();
+    const action = String(fields.action || "").trim().toLowerCase();
+    if (!skill || !action) continue;
+
+    if (action === "remove type" && fields.type) {
+      rules.push({ skill, action, type: String(fields.type || "").trim() });
+      continue;
+    }
+    if (action === "remove method" && fields.method) {
+      rules.push({ skill, action, method: String(fields.method || "").trim() });
+      continue;
+    }
+    if (action === "add method") {
+      const method = String(fields.method || "").trim();
+      const type = String(fields.type || "").trim() || "Default";
+      const level = Number.parseInt(String(fields.level || "").trim(), 10);
+      const xp = Number.parseFloat(String(fields.xp || "").trim());
+      if (method && Number.isFinite(level) && level >= 1 && Number.isFinite(xp) && xp > 0) {
+        rules.push({ skill, action, method, type, level, xp });
+      }
+      continue;
+    }
+    if (action === "change type") {
+      const method = String(fields.method || "").trim();
+      const fromType = String(fields["from type"] || "").trim();
+      const type = String(fields["to type"] || fields.type || "").trim();
+      if (type) rules.push({ skill, action, method, fromType, type });
+    }
+  }
+  return rules;
+}
+
+function applyMethodTransformRules(rows, skillName, rules) {
+  if (!Array.isArray(rows) || !rows.length || !Array.isArray(rules) || !rules.length) return rows;
+  let out = [...rows];
+  for (const rule of rules) {
+    if (!equalsIgnoreCaseTrim(rule.skill, skillName)) continue;
+    if (rule.action === "remove type") {
+      out = out.filter((r) => !equalsIgnoreCaseTrim(r.type, rule.type));
+      continue;
+    }
+    if (rule.action === "remove method") {
+      out = out.filter((r) => !equalsIgnoreCaseTrim(r.method, rule.method));
+      continue;
+    }
+    if (rule.action === "change type") {
+      out = out.map((r) => {
+        const methodOk = !rule.method || equalsIgnoreCaseTrim(r.method, rule.method);
+        const fromTypeOk = !rule.fromType || equalsIgnoreCaseTrim(r.type, rule.fromType);
+        if (methodOk && fromTypeOk) return { ...r, type: rule.type };
+        return r;
+      });
+      continue;
+    }
+    if (rule.action === "add method") {
+      out.push({
+        type: String(rule.type || "Default"),
+        method: String(rule.method || "").trim(),
+        level: Math.max(1, Number.parseInt(rule.level, 10) || 1),
+        xp: Number.parseFloat(rule.xp),
+      });
+    }
+  }
+  return out;
+}
+
+async function fetchWikiMethodsForSkill(skillName) {
+  const moduleTitle = `Module:Skill calc/${skillName}/data`;
+  const params = new URLSearchParams({
+    action: "query",
+    format: "json",
+    formatversion: "2",
+    prop: "revisions",
+    rvslots: "main",
+    rvprop: "content",
+    titles: moduleTitle,
+    origin: "*",
+  });
+  const url = `https://runescape.wiki/api.php?${params.toString()}`;
+  const res = await fetch(url, { cache: "no-cache" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  const lua = String(json?.query?.pages?.[0]?.revisions?.[0]?.slots?.main?.content || "");
+  if (!lua.trim()) return [];
+  const parseLua = stripLuaComments(lua);
+
+  const rows = [];
+  parseMethodsTableStyleLua(parseLua, rows);
+  parseTrainMethodStyleLua(parseLua, rows);
+  parseArchaeologyHotspotsStyleLua(parseLua, rows);
+  parseCategoryModuleStyleLua(parseLua, rows);
+  return postProcessWikiRows(skillName, rows);
+}
+
+function postProcessWikiRows(skillName, rows) {
+  const key = normalizeKey(skillName);
+  if (key !== "cooking" || !Array.isArray(rows) || !rows.length) return rows;
+  const sourceSuffixExclusions = new Set([
+    "ugthanki meat",
+    "arcane apoterrasaur meat",
+    "scimitops meat",
+    "bagrada rex meat",
+    "spicati apoterrasaur meat",
+    "asciatops meat",
+    "corbicula rex meat",
+    "oculi apoterrasaur meat",
+    "malletops meat",
+    "pavosaurus rex meat",
+    "primal starter",
+    "primal main course",
+  ]);
+
+  const out = rows.map((row) => ({
+    ...row,
+    method: String(row.method || "").trim(),
+    type: String(row.type || "").trim(),
+    materials: Array.isArray(row.materials) ? row.materials : [],
+  }));
+
+  for (const row of out) {
+    const materials = row.materials.map((m) => String(m || "").trim()).filter(Boolean);
+    const rawMeat = materials.find((m) => /^Raw\s+.+\s+meat$/i.test(m));
+    if (rawMeat && !sourceSuffixExclusions.has(row.method.toLowerCase())) {
+      const match = rawMeat.match(/^Raw\s+(.+?)\s+meat$/i);
+      const source = match?.[1] ? toDisplayName(match[1]) : "";
+      if (source && !/\s\([^)]*\)$/.test(row.method)) {
+        row.method = `${row.method} (${source})`;
+      }
+    }
+    if (materials.some((m) => /edicap potato/i.test(m)) && !/\s\(Scratch\)$/i.test(row.method)) {
+      row.method = `${row.method} (Scratch)`;
+    }
+  }
+
+  const byKey = new Map();
+  for (let i = 0; i < out.length; i++) {
+    const row = out[i];
+    const groupKey = `${row.type}|||${row.method}`;
+    const list = byKey.get(groupKey) || [];
+    list.push(i);
+    byKey.set(groupKey, list);
+  }
+
+  for (const indexes of byKey.values()) {
+    if (indexes.length <= 1) continue;
+    for (const idx of indexes) {
+      const row = out[idx];
+      const mats = row.materials.map((m) => String(m || "").trim());
+      if (!/\s\([^)]*\)$/.test(row.method)) {
+        if (mats.some((m) => /curry leaf/i.test(m))) row.method = `${row.method} (Curry Leaf)`;
+        else if (mats.some((m) => /\bspice\b/i.test(m))) row.method = `${row.method} (Spice)`;
+      }
+    }
+  }
+
+  const counts = new Map();
+  for (const row of out) {
+    const groupKey = `${row.type}|||${row.method}`;
+    const n = (counts.get(groupKey) || 0) + 1;
+    counts.set(groupKey, n);
+    if (n > 1) {
+      if (/dungeoneering/i.test(row.type) && n === 2 && !/\s\(Scratch\)$/i.test(row.method)) {
+        row.method = `${row.method} (Scratch)`;
+      } else {
+        row.method = `${row.method} (Alt ${n})`;
+      }
+    }
+  }
+
+  return out.map((row) => ({
+    type: row.type,
+    method: row.method,
+    level: row.level,
+    xp: row.xp,
+  }));
+}
+
+function parseMethodsTableStyleLua(lua, out) {
+  const re = /methods\s*\[\s*(["'])([^"']+)\1\s*]\s*=\s*\{/g;
+  let m;
+  while ((m = re.exec(lua))) {
+    const type = String(m[2] || "").trim();
+    const open = lua.indexOf("{", m.index);
+    const close = findMatchingBraceLua(lua, open);
+    if (open < 0 || close < 0) continue;
+    const block = lua.slice(open, close + 1);
+    pushTrainMethodRowsFromLuaBlock(block, type, out);
+  }
+}
+
+function parseTrainMethodStyleLua(lua, out) {
+  const localTables = new Map();
+  const tableRe = /local\s+([A-Za-z_]\w*)\s*=\s*\{/g;
+  let tableMatch;
+  while ((tableMatch = tableRe.exec(lua))) {
+    const tableName = String(tableMatch[1] || "").trim();
+    if (!tableName) continue;
+    const open = lua.indexOf("{", tableMatch.index);
+    const close = findMatchingBraceLua(lua, open);
+    if (open < 0 || close < 0) continue;
+    localTables.set(tableName, lua.slice(open, close + 1));
+  }
+
+  const branches = [];
+  const branchRe = /\b(?:if|elseif)\s+trainMethod\s*==\s*(["'])([^"']+)\1\s*then/gi;
+  let m;
+  while ((m = branchRe.exec(lua))) {
+    branches.push({
+      type: String(m[2] || "").trim(),
+      bodyStart: branchRe.lastIndex,
+      branchStart: m.index,
+    });
+  }
+
+  for (let i = 0; i < branches.length; i++) {
+    const current = branches[i];
+    const type = current.type;
+    if (!type || /^all$/i.test(type)) continue;
+    const bodyEnd = i + 1 < branches.length ? branches[i + 1].branchStart : lua.length;
+    const ifBody = lua.slice(current.bodyStart, bodyEnd);
+
+    const returnMatch = /return\s+([A-Za-z_]\w*)/i.exec(ifBody);
+    if (returnMatch) {
+      const tableName = String(returnMatch[1] || "").trim();
+      const usesGenericMethodsVar = /^methods$/i.test(tableName);
+      if (!usesGenericMethodsVar) {
+        const tableBlock = localTables.get(tableName);
+        if (tableBlock) {
+          const beforeCount = out.length;
+          pushTrainMethodRowsFromLuaBlock(tableBlock, type, out);
+          if (out.length > beforeCount) continue;
+        }
+      }
+    }
+
+    const inlineReturnIdx = ifBody.search(/return\s*\{/i);
+    if (inlineReturnIdx >= 0) {
+      const open = ifBody.indexOf("{", inlineReturnIdx);
+      const close = findMatchingBraceLua(ifBody, open);
+      if (open >= 0 && close >= 0) {
+        pushTrainMethodRowsFromLuaBlock(ifBody.slice(open, close + 1), type, out);
+        continue;
+      }
+    }
+
+    const assignRe = /\b(?:local\s+)?([A-Za-z_]\w*)\s*=\s*\{/gi;
+    let assignMatch;
+    let pushed = false;
+    while ((assignMatch = assignRe.exec(ifBody))) {
+      const open = ifBody.indexOf("{", assignMatch.index);
+      const close = findMatchingBraceLua(ifBody, open);
+      if (open < 0 || close < 0) continue;
+      const beforeCount = out.length;
+      pushTrainMethodRowsFromLuaBlock(ifBody.slice(open, close + 1), type, out);
+      if (out.length > beforeCount) {
+        pushed = true;
+        break;
+      }
+    }
+    if (pushed) continue;
+  }
+}
+
+function pushTrainMethodRowsFromLuaBlock(block, type, out) {
+  for (const entry of extractTopLevelObjectsLua(block)) {
+    const name = extractLuaStringFieldJs(entry, "name");
+    const title = extractLuaStringFieldJs(entry, "title");
+    const level = extractLuaIntFieldJs(entry, "level");
+    const xp = extractLuaNumberFieldJs(entry, "xp");
+    const materials = extractMaterialNamesLua(entry);
+    const method = (title || name || "").trim();
+    if (!method || !Number.isFinite(xp)) continue;
+    out.push({ type: type || "Default", method, level: Number.isFinite(level) ? level : 1, xp, materials });
+  }
+}
+
+function parseArchaeologyHotspotsStyleLua(lua, out) {
+  const hotspotIdx = lua.indexOf("p.hotspots");
+  if (hotspotIdx < 0) return;
+  const open = lua.indexOf("{", hotspotIdx);
+  const close = findMatchingBraceLua(lua, open);
+  if (open < 0 || close < 0) return;
+  const block = lua.slice(open, close + 1);
+  for (const entry of extractTopLevelKeyedEntriesLua(block)) {
+    const level = extractLuaIntFieldJs(entry.body, "level");
+    const xp = extractLuaNumberFieldJs(entry.body, "successxp");
+    const digsite = extractLuaStringFieldJs(entry.body, "digsite");
+    if (!Number.isFinite(xp)) continue;
+    out.push({
+      type: (digsite || "Hotspots").trim(),
+      method: entry.key,
+      level: Number.isFinite(level) ? level : 1,
+      xp,
+    });
+  }
+}
+
+function parseCategoryModuleStyleLua(lua, out) {
+  const categories = parseCategoryMapLua(lua);
+  if (!categories.length) return;
+  for (const { id, display } of categories) {
+    const marker = `p.${id}`;
+    const idx = lua.indexOf(marker);
+    if (idx < 0) continue;
+    const open = lua.indexOf("{", idx);
+    const close = findMatchingBraceLua(lua, open);
+    if (open < 0 || close < 0) continue;
+    const block = lua.slice(open, close + 1);
+    const entries = extractTopLevelKeyedEntriesLua(block);
+    for (const entry of entries) {
+      const name = extractLuaStringFieldJs(entry.body, "name");
+      const level = extractLuaIntFieldJs(entry.body, "level");
+      const xp = extractLuaNumberFieldJs(entry.body, "xp");
+      if (name && Number.isFinite(level) && Number.isFinite(xp)) {
+        out.push({ type: display, method: name, level, xp });
+        continue;
+      }
+      if (!name) continue;
+      const recipes = extractLuaTableFieldJs(entry.body, "recipes");
+      if (!recipes) continue;
+      for (const recipe of extractTopLevelObjectsLua(recipes)) {
+        const rLevel = extractLuaIntFieldJs(recipe, "level");
+        const rXp = extractLuaNumberFieldJs(recipe, "xp");
+        if (!Number.isFinite(rLevel) || !Number.isFinite(rXp)) continue;
+        const method = extractLuaStringFieldJs(recipe, "method");
+        out.push({ type: display, method: method ? `${name} - ${method}` : name, level: rLevel, xp: rXp });
+      }
+    }
+  }
+}
+
+function parseCategoryMapLua(lua) {
+  const idx = lua.indexOf("p.categories");
+  if (idx < 0) return [];
+  const open = lua.indexOf("{", idx);
+  const close = findMatchingBraceLua(lua, open);
+  if (open < 0 || close < 0) return [];
+  const block = lua.slice(open, close + 1);
+  const out = [];
+  const re = /\[\s*(["'])([^"']+)\1\s*]\s*=\s*(["'])([^"']+)\3/g;
+  let m;
+  while ((m = re.exec(block))) {
+    out.push({ display: m[2].trim(), id: m[4].trim() });
+  }
+  return out;
+}
+
+function findMatchingBraceLua(text, openPos) {
+  if (openPos < 0) return -1;
+  let depth = 0;
+  let inString = false;
+  let stringQuote = "";
+  let escaped = false;
+  for (let i = openPos; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (ch === stringQuote) {
+        inString = false;
+        stringQuote = "";
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      inString = true;
+      stringQuote = ch;
+      continue;
+    }
+    if (ch === "{") depth += 1;
+    if (ch === "}") depth -= 1;
+    if (depth === 0) return i;
+  }
+  return -1;
+}
+
+function stripLuaComments(text) {
+  const src = String(text || "");
+  let out = "";
+  let i = 0;
+  let inString = false;
+  let quote = "";
+  let escaped = false;
+  while (i < src.length) {
+    const ch = src[i];
+    if (inString) {
+      out += ch;
+      if (escaped) {
+        escaped = false;
+      } else if (ch === "\\") {
+        escaped = true;
+      } else if (ch === quote) {
+        inString = false;
+        quote = "";
+      }
+      i += 1;
+      continue;
+    }
+
+    if (ch === '"' || ch === "'") {
+      inString = true;
+      quote = ch;
+      out += ch;
+      i += 1;
+      continue;
+    }
+
+    if (ch === "-" && src[i + 1] === "-") {
+      const longStart = src.slice(i + 2).match(/^\[(=*)\[/);
+      if (longStart) {
+        const eq = longStart[1] || "";
+        const openerLen = 2 + longStart[0].length;
+        const closer = `]${eq}]`;
+        const closeIdx = src.indexOf(closer, i + openerLen);
+        if (closeIdx >= 0) {
+          i = closeIdx + closer.length;
+          continue;
+        }
+        break;
+      }
+      while (i < src.length && src[i] !== "\n") i += 1;
+      continue;
+    }
+
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
+function extractTopLevelObjectsLua(block) {
+  const out = [];
+  if (!block || block.length < 2) return out;
+  let depth = 0;
+  let inString = false;
+  let quote = "";
+  let escaped = false;
+  let start = -1;
+  for (let i = 0; i < block.length; i++) {
+    const ch = block[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escaped = true;
+        continue;
+      }
+      if (ch === quote) {
+        inString = false;
+        quote = "";
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      inString = true;
+      quote = ch;
+      continue;
+    }
+    if (ch === "{") {
+      depth += 1;
+      if (depth === 2) start = i;
+    } else if (ch === "}") {
+      if (depth === 2 && start >= 0) {
+        out.push(block.slice(start, i + 1));
+        start = -1;
+      }
+      depth -= 1;
+    }
+  }
+  return out;
+}
+
+function extractTopLevelKeyedEntriesLua(block) {
+  const out = [];
+  const re = /\[\s*(["'])([^"']+)\1\s*]\s*=\s*\{/g;
+  let cursor = 0;
+  while (cursor < block.length) {
+    re.lastIndex = cursor;
+    const m = re.exec(block);
+    if (!m) break;
+    const key = String(m[2] || "").trim();
+    const open = block.indexOf("{", m.index);
+    const close = findMatchingBraceLua(block, open);
+    if (!key || open < 0 || close < 0) break;
+    out.push({ key, body: block.slice(open, close + 1) });
+    cursor = close + 1;
+  }
+  return out;
+}
+
+function extractLuaTableFieldJs(entry, field) {
+  const re = new RegExp(`\\b${escapeRegExp(field)}\\s*=\\s*\\{`, "m");
+  const m = re.exec(entry);
+  if (!m) return null;
+  const open = entry.indexOf("{", m.index);
+  const close = findMatchingBraceLua(entry, open);
+  if (open < 0 || close < 0) return null;
+  return entry.slice(open, close + 1);
+}
+
+function extractLuaStringFieldJs(entry, field) {
+  const re = new RegExp(`\\b${escapeRegExp(field)}\\s*=\\s*\"((?:\\\\\"|[^\"])*)\"`);
+  const m = re.exec(entry);
+  if (!m) return "";
+  return String(m[1] || "").replace(/\\"/g, "\"").trim();
+}
+
+function extractLuaIntFieldJs(entry, field) {
+  const re = new RegExp(`\\b${escapeRegExp(field)}\\s*=\\s*(-?[\\d,]+)`);
+  const m = re.exec(entry);
+  if (!m) return NaN;
+  return Number.parseInt(String(m[1]).replace(/,/g, ""), 10);
+}
+
+function extractLuaNumberFieldJs(entry, field) {
+  const re = new RegExp(`\\b${escapeRegExp(field)}\\s*=\\s*(-?[\\d,]+(?:\\.\\d+)?)`);
+  const m = re.exec(entry);
+  if (!m) return NaN;
+  return Number.parseFloat(String(m[1]).replace(/,/g, ""));
+}
+
+function extractMaterialNamesLua(entry) {
+  const field = extractLuaTableFieldJs(entry, "material");
+  if (!field) return [];
+  const names = [];
+  const re = /["']([^"']+)["']/g;
+  let m;
+  while ((m = re.exec(field))) {
+    const value = String(m[1] || "").trim();
+    if (value) names.push(value);
+  }
+  return names;
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function parseSkillFile(fileName, text) {
@@ -761,6 +1463,8 @@ function parseSkillFile(fileName, text) {
     xpPercent: null,
     xpMultiplier: null,
     xpFlat: null,
+    applyTypes: [],
+    applyActions: [],
     slots: [],
     setName: "",
     setPieces: [],
@@ -804,6 +1508,8 @@ function parseSkillFile(fileName, text) {
         xpPercent: null,
         xpMultiplier: null,
         xpFlat: null,
+        applyTypes: [],
+        applyActions: [],
         slots: [],
         setName: "",
         setPieces: [],
@@ -822,6 +1528,8 @@ function parseSkillFile(fileName, text) {
         xpPercent: null,
         xpMultiplier: null,
         xpFlat: null,
+        applyTypes: [],
+        applyActions: [],
         slots: [],
         setName: "",
         setPieces: [],
@@ -876,6 +1584,23 @@ function parseSkillFile(fileName, text) {
       const n = Number.parseFloat(line.slice(8).trim());
       if (Number.isFinite(n)) boost.xpFlat = n;
       else issues.push({ line: lineNo, message: "Invalid XP-Flat value." });
+      continue;
+    }
+    if (lower.startsWith("apply-type:")) {
+      if (block !== "boost") {
+        issues.push({ line: lineNo, message: "Apply-Type is outside a Boost block." });
+        continue;
+      }
+      boost.applyTypes = parseBoostDisableList(line.slice(11));
+      continue;
+    }
+    if (lower.startsWith("apply-action:") || lower.startsWith("apply-method:")) {
+      if (block !== "boost") {
+        issues.push({ line: lineNo, message: "Apply-Action is outside a Boost block." });
+        continue;
+      }
+      const rawTargets = lower.startsWith("apply-action:") ? line.slice(13) : line.slice(13);
+      boost.applyActions = parseBoostDisableList(rawTargets);
       continue;
     }
     if (lower.startsWith("disables:")) {
@@ -973,6 +1698,8 @@ function finalizeBoost(boosts, b, issues, lineNo) {
     xpPercent: numOrNull(b.xpPercent),
     xpMultiplier: numOrNull(b.xpMultiplier),
     xpFlat: numOrNull(b.xpFlat),
+    applyTypes: Array.isArray(b.applyTypes) ? b.applyTypes : [],
+    applyActions: Array.isArray(b.applyActions) ? b.applyActions : [],
     slots: Array.isArray(b.slots) ? b.slots : [],
     setName: String(b.setName || "").trim(),
     setPieces: Array.isArray(b.setPieces) ? b.setPieces : [],
@@ -1102,13 +1829,22 @@ function renderSkillsGrid() {
   refs.skillsGrid.innerHTML = "";
   const order = effectiveSkillOrder();
   let dragFromKey = null;
+  let failedCount = 0;
+  const failedNames = [];
 
   for (const skill of order) {
+    const importStatus = getSkillImportStatus(skill.key);
+    const importFailed = importStatus?.status === "failed";
+    if (importFailed) {
+      failedCount += 1;
+      failedNames.push(skill.name);
+    }
     const button = refs.skillButtonTemplate.content.firstElementChild.cloneNode(true);
     button.dataset.skillKey = skill.key;
     button.draggable = true;
     if (skill.key === state.selectedSkillKey) button.classList.add("selected");
     if (skill.locked) button.classList.add("locked");
+    if (importFailed) button.classList.add("import-failed");
 
     const titleEl = button.querySelector(".skill-btn-title");
     titleEl.textContent = "";
@@ -1136,7 +1872,13 @@ function renderSkillsGrid() {
     button.classList.toggle("maxed", isMaxXp);
     button.querySelector(".skill-btn-level").textContent = isMaxXp ? "MAX" : `${shownLevel} / ${maxLevel}`;
     button.querySelector(".skill-btn-xp").textContent = isMaxXp ? "" : `${formatInt(evalResult.currentXp)} xp`;
-    button.querySelector(".skill-btn-mode").textContent = skill.locked ? "[LOCKED]" : (evalResult.goalActive ? "[GOAL]" : "[NEXT]");
+    button.querySelector(".skill-btn-mode").textContent = importFailed
+      ? "[DATA ERR]"
+      : (skill.locked ? "[LOCKED]" : (evalResult.goalActive ? "[GOAL]" : "[NEXT]"));
+    if (importFailed) {
+      const retryAt = Number.isFinite(importStatus?.nextRetryAt) ? new Date(importStatus.nextRetryAt).toLocaleTimeString() : "soon";
+      button.title = `${skill.name}: data import failed. ${importStatus?.error || "Unknown error"} Next retry: ${retryAt}`;
+    }
 
     const pct = evalResult.buttonProgress;
     const fill = button.querySelector(".skill-btn-progress-fill");
@@ -1146,6 +1888,11 @@ function renderSkillsGrid() {
     fill.classList.toggle("next-track", !evalResult.goalActive);
 
     button.addEventListener("click", () => {
+      if (importFailed) {
+        showBottomNotice(`${skill.name} data fetch failed. Retrying now...`, "error");
+        void retrySkillImportByKey(skill.key);
+        return;
+      }
       if (skill.locked) return;
       if (state.selectedSkillKey === skill.key) return;
       const prevKey = state.selectedSkillKey;
@@ -1197,6 +1944,15 @@ function renderSkillsGrid() {
     });
 
     refs.skillsGrid.appendChild(button);
+  }
+  if (refs.skillsHeaderTitle) {
+    if (failedCount > 0) {
+      refs.skillsHeaderTitle.textContent = `Skills (${failedCount} data error${failedCount === 1 ? "" : "s"})`;
+      refs.skillsHeaderTitle.title = `Failed imports: ${failedNames.join(", ")}`;
+    } else {
+      refs.skillsHeaderTitle.textContent = "Skills";
+      refs.skillsHeaderTitle.removeAttribute("title");
+    }
   }
 }
 
@@ -1310,12 +2066,12 @@ function renderMethodTabs(skill, skillState) {
   if (refs.methodsHeaderControls) refs.methodsHeaderControls.innerHTML = "";
   const allTypes = distinctTypes(skill.methods.map((m) => m.type), "Default");
   const orderedTypes = applySavedOrder(allTypes, skillState.methodTabOrder);
-  const ordered = [...orderedTypes, METHOD_ALL_TAB_LABEL];
+  const ordered = [...orderedTypes];
   skillState.methodTabOrder = orderedTypes;
   skillState.methodSorts = normalizeMethodSorts(skillState.methodSorts);
 
   let selected = skillState.selectedMethodTab;
-  if (!ordered.includes(selected)) selected = orderedTypes[0] ?? METHOD_ALL_TAB_LABEL;
+  if (!ordered.includes(selected)) selected = orderedTypes[0] ?? null;
   skillState.selectedMethodTab = selected;
 
   const tabList = document.createElement("div");
@@ -1326,12 +2082,11 @@ function renderMethodTabs(skill, skillState) {
 
   let dragFrom = null;
   for (const type of ordered) {
-    const isAllTab = type === METHOD_ALL_TAB_LABEL;
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `tab-btn${type === selected ? " active" : ""}`;
     btn.textContent = type;
-    btn.draggable = !isAllTab;
+    btn.draggable = true;
 
     btn.addEventListener("click", () => {
       skillState.selectedMethodTab = type;
@@ -1340,31 +2095,29 @@ function renderMethodTabs(skill, skillState) {
       recalcAndRender();
     });
 
-    if (!isAllTab) {
-      btn.addEventListener("dragstart", () => {
-        dragFrom = type;
-        setDraggingCursorEnabled(true);
-      });
-      btn.addEventListener("dragover", (e) => e.preventDefault());
-      btn.addEventListener("drop", (e) => {
-        e.preventDefault();
-        if (!dragFrom || dragFrom === type) return;
-        const list = [...skillState.methodTabOrder];
-        const from = list.indexOf(dragFrom);
-        const to = list.indexOf(type);
-        if (from < 0 || to < 0) return;
-        const moved = list.splice(from, 1)[0];
-        list.splice(to, 0, moved);
-        skillState.methodTabOrder = list;
-        persistProfile();
-        renderMethodTabs(skill, skillState);
-        recalcAndRender();
-      });
-      btn.addEventListener("dragend", () => {
-        dragFrom = null;
-        setDraggingCursorEnabled(false);
-      });
-    }
+    btn.addEventListener("dragstart", () => {
+      dragFrom = type;
+      setDraggingCursorEnabled(true);
+    });
+    btn.addEventListener("dragover", (e) => e.preventDefault());
+    btn.addEventListener("drop", (e) => {
+      e.preventDefault();
+      if (!dragFrom || dragFrom === type) return;
+      const list = [...skillState.methodTabOrder];
+      const from = list.indexOf(dragFrom);
+      const to = list.indexOf(type);
+      if (from < 0 || to < 0) return;
+      const moved = list.splice(from, 1)[0];
+      list.splice(to, 0, moved);
+      skillState.methodTabOrder = list;
+      persistProfile();
+      renderMethodTabs(skill, skillState);
+      recalcAndRender();
+    });
+    btn.addEventListener("dragend", () => {
+      dragFrom = null;
+      setDraggingCursorEnabled(false);
+    });
 
     tabList.appendChild(btn);
   }
@@ -1501,9 +2254,8 @@ function recalcAndRender(refreshSkillsGrid = true) {
   const xpToLevel = Math.max(0, nextLevelXp - currentXp);
 
   const enabledBoosts = skill.boosts.filter((b) => skillState.enabledBoostIds.includes(boostId(b)));
-  const boostEffects = computeBoostEffects(enabledBoosts);
-  const boostMultiplier = boostEffects.multiplier;
-  const boostFlatXp = boostEffects.flatXp;
+  const hasTargetedBoosts = enabledBoosts.some((b) => boostHasMethodTargeting(b));
+  const globalBoostEffects = computeBoostEffects(enabledBoosts.filter((b) => !boostHasMethodTargeting(b)));
 
   refs.currentXp.disabled = false;
   refs.goalStartLevel.max = String(effectiveMaxLevel);
@@ -1580,9 +2332,11 @@ function recalcAndRender(refreshSkillsGrid = true) {
       refs.methodsTitle.textContent = `Methods (${formatInt(remaining)} xp to ${methodsTarget})`;
     }
   }
-  refs.boostFactor.textContent = boostFlatXp !== 0
-    ? `x${boostMultiplier.toFixed(2)} (+${formatNumber(boostFlatXp)} xp)`
-    : `x${boostMultiplier.toFixed(2)}`;
+  refs.boostFactor.textContent = hasTargetedBoosts
+    ? "Varies by method"
+    : (globalBoostEffects.flatXp !== 0
+      ? `x${globalBoostEffects.multiplier.toFixed(2)} (+${formatNumber(globalBoostEffects.flatXp)} xp)`
+      : `x${globalBoostEffects.multiplier.toFixed(2)}`);
   refs.xpNeeded.textContent = goalActive ? formatInt(xpNeeded) : "Goal disabled / not set";
   refs.goalProgressText.textContent = goalActive
     ? `${goalPercent}% (${formatInt(doneGoalXp)} / ${formatInt(totalGoalXp)} XP)`
@@ -1600,8 +2354,7 @@ function recalcAndRender(refreshSkillsGrid = true) {
     currentLevel,
     goalResolvedLevel: goalActive ? shownGoalEndLevel : nextLevel,
     xpNeeded: methodsXpNeeded,
-    boostMultiplier,
-    boostFlatXp,
+    enabledBoosts,
   });
 
   persistProfile();
@@ -1612,12 +2365,15 @@ function renderMethodRows(skill, calc) {
   hideWikiPreview();
   const skillState = getSkillState(skill.key);
   const selectedType = skillState.selectedMethodTab;
+  if (!selectedType) return;
   const rows = [...skill.methods]
-    .filter((m) => selectedType === METHOD_ALL_TAB_LABEL || m.type === selectedType)
+    .filter((m) => m.type === selectedType)
     .map((m, index) => {
       const parsedAction = parseActionText(m.action);
-      const effectiveXp = (m.xpPerAction * calc.boostMultiplier) + (calc.boostFlatXp || 0);
-      const actionsNeeded = calc.xpNeeded > 0 ? Math.ceil(calc.xpNeeded / effectiveXp) : 0;
+      const methodBoosts = calc.enabledBoosts.filter((b) => boostAppliesToMethod(b, m));
+      const boostEffects = computeBoostEffects(methodBoosts);
+      const effectiveXp = (m.xpPerAction * boostEffects.multiplier) + (boostEffects.flatXp || 0);
+      const actionsNeeded = (calc.xpNeeded > 0 && effectiveXp > 0) ? Math.ceil(calc.xpNeeded / effectiveXp) : 0;
       return {
         m,
         index,
@@ -1650,9 +2406,10 @@ function renderMethodRows(skill, calc) {
     if (m.requiredLevel <= calc.currentLevel) tr.classList.add("can-now");
     else if (m.requiredLevel <= calc.goalResolvedLevel) tr.classList.add("can-goal");
 
-    const previewTitle = wikiActionTitle(row.parsedAction.displayName);
+    const wikiTarget = wikiTargetForMethod(skill, m, row.parsedAction.displayName);
+    const previewTitle = wikiTarget.previewTitle;
     const actionHtml = row.parsedAction.linkEnabled
-      ? `<a href="${escapeHtml(wikiActionUrl(row.parsedAction.displayName))}" data-wiki-preview-title="${escapeHtml(previewTitle)}" target="_blank" rel="noopener noreferrer">${escapeHtml(row.parsedAction.displayName)}</a>`
+      ? `<a href="${escapeHtml(wikiTarget.url)}" data-wiki-preview-title="${escapeHtml(previewTitle)}" target="_blank" rel="noopener noreferrer">${escapeHtml(row.parsedAction.displayName)}</a>`
       : escapeHtml(row.parsedAction.displayName);
     tr.innerHTML = `<td>${actionHtml}</td><td>${row.requiredLevel}</td><td>${formatNumber(row.xpPerAction)}</td><td>${formatInt(row.actionsNeeded)}</td>`;
     tbody.appendChild(tr);
@@ -1687,9 +2444,7 @@ function cycleMethodSort(skillState, key) {
 function effectiveMethodSorts(skillState) {
   const userSorts = normalizeMethodSorts(skillState.methodSorts);
   if (userSorts.length) return userSorts;
-  return skillState.selectedMethodTab === METHOD_ALL_TAB_LABEL
-    ? [{ key: "requiredLevel", dir: "asc" }]
-    : [];
+  return [{ key: "requiredLevel", dir: "asc" }];
 }
 
 function normalizeMethodSorts(input) {
@@ -1745,6 +2500,25 @@ function wikiActionTitle(actionName) {
 function wikiActionUrl(actionName) {
   const cleaned = wikiActionTitle(actionName);
   return `https://runescape.wiki/w/${encodeURIComponent(cleaned)}`;
+}
+
+function wikiTargetForMethod(skill, method, actionName) {
+  const skillKey = normalizeKey(skill?.name || "");
+  const typeText = String(method?.type || "");
+  const isInvention = skillKey === "invention";
+  const isDisassemblingOrSiphoning = /disassembling|siphoning/i.test(typeText);
+
+  if (isInvention && isDisassemblingOrSiphoning) {
+    return {
+      url: "https://runescape.wiki/w/Calculator:Equipment_experience_by_tier",
+      previewTitle: "Calculator:Equipment experience by tier",
+    };
+  }
+
+  return {
+    url: wikiActionUrl(actionName),
+    previewTitle: wikiActionTitle(actionName),
+  };
 }
 
 function syncMethodTableHeaderGutter() {
@@ -2131,6 +2905,31 @@ function computeBoostEffects(boosts) {
     multiplier: multi * (1 + percent / 100),
     flatXp,
   };
+}
+
+function normalizeMethodTargetToken(token) {
+  return String(token || "").trim().toLowerCase();
+}
+
+function boostHasMethodTargeting(boost) {
+  const typeTargets = Array.isArray(boost?.applyTypes) ? boost.applyTypes : [];
+  const actionTargets = Array.isArray(boost?.applyActions) ? boost.applyActions : [];
+  return typeTargets.length > 0 || actionTargets.length > 0;
+}
+
+function boostAppliesToMethod(boost, method) {
+  if (!boostHasMethodTargeting(boost)) return true;
+  const methodType = normalizeMethodTargetToken(method?.type);
+  const methodAction = normalizeMethodTargetToken(method?.action);
+  const typeTargets = (Array.isArray(boost?.applyTypes) ? boost.applyTypes : [])
+    .map(normalizeMethodTargetToken)
+    .filter(Boolean);
+  const actionTargets = (Array.isArray(boost?.applyActions) ? boost.applyActions : [])
+    .map(normalizeMethodTargetToken)
+    .filter(Boolean);
+  const typeMatch = !typeTargets.length || typeTargets.includes(methodType);
+  const actionMatch = !actionTargets.length || actionTargets.includes(methodAction);
+  return typeMatch && actionMatch;
 }
 
 function boostLabel(boost) {
@@ -2612,6 +3411,11 @@ async function fetchRs3HiscoreXp(playerName) {
 function debugLog(level, message) {
   void level;
   void message;
+}
+
+function equalsIgnoreCaseTrim(a, b) {
+  if (a == null || b == null) return false;
+  return String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
 }
 
 function parseRs3HiscoreLite(text) {
