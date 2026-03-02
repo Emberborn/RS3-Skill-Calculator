@@ -15,22 +15,3 @@
 
 Curve: invention
 
-Method: Disassemble low-level item
-Type: Disassemble
-XP: 120
-
-Method: Disassemble mid-level item
-Type: Disassemble
-Level: 27
-XP: 240
-
-Method: Disassemble high-level item
-Type: Disassemble
-Level: 60
-XP: 540
-
-Method: Equipment siphon (example)
-Type: Equipment
-Level: 27
-XP: 1000
-

@@ -1,0 +1,229 @@
+﻿# Skill method transforms for wiki-imported methods.
+# Format: key/value lines separated by a blank line.
+# Actions: Remove Type, Remove Method, Change Type
+
+Skill: Farming
+Action: Remove Type
+Type: Testing
+
+Skill: Pouches
+Action: Remove Type
+Type: Testing
+
+Skill: Fletching
+Action: Remove Method
+Method: Fletching XP
+
+Skill: Agility
+Action: Remove Type
+Type: Wilderness Agility Course
+
+Skill: Agility
+Action: Add Method
+Type: Wilderness Agility Course
+Method: Wilderness Agility Course
+Level: 50
+XP: 571.4
+
+# Magic categorization
+Skill: Magic
+Action: Change Type
+Method: Enchant Opal bolts
+Type: Enchanting - Bolts
+
+Skill: Magic
+Action: Change Type
+Method: Enchant Sapphire bolts
+Type: Enchanting - Bolts
+
+Skill: Magic
+Action: Change Type
+Method: Enchant Jade bolts
+Type: Enchanting - Bolts
+
+Skill: Magic
+Action: Change Type
+Method: Enchant Pearl bolts
+Type: Enchanting - Bolts
+
+Skill: Magic
+Action: Change Type
+Method: Enchant Emerald bolts
+Type: Enchanting - Bolts
+
+Skill: Magic
+Action: Change Type
+Method: Enchant Topaz bolts
+Type: Enchanting - Bolts
+
+Skill: Magic
+Action: Change Type
+Method: Enchant Ruby bolts
+Type: Enchanting - Bolts
+
+Skill: Magic
+Action: Change Type
+Method: Enchant Diamond bolts
+Type: Enchanting - Bolts
+
+Skill: Magic
+Action: Change Type
+Method: Enchant Dragon bolts
+Type: Enchanting - Bolts
+
+Skill: Magic
+Action: Change Type
+Method: Enchant Onyx/Ascendri bolts
+Type: Enchanting - Bolts
+
+Skill: Magic
+Action: Change Type
+Method: Lvl-1 Enchant
+Type: Enchanting - Jewellery
+
+Skill: Magic
+Action: Change Type
+Method: Lvl-2 Enchant
+Type: Enchanting - Jewellery
+
+Skill: Magic
+Action: Change Type
+Method: Lvl-3 Enchant
+Type: Enchanting - Jewellery
+
+Skill: Magic
+Action: Change Type
+Method: Lvl-4 Enchant
+Type: Enchanting - Jewellery
+
+Skill: Magic
+Action: Change Type
+Method: Lvl-5 Enchant
+Type: Enchanting - Jewellery
+
+Skill: Magic
+Action: Change Type
+Method: Lvl-6 Enchant
+Type: Enchanting - Jewellery
+
+Skill: Magic
+Action: Change Type
+Method: Charge Water Orb
+Type: Orb Charging
+
+Skill: Magic
+Action: Change Type
+Method: Charge Earth Orb
+Type: Orb Charging
+
+Skill: Magic
+Action: Change Type
+Method: Charge Fire Orb
+Type: Orb Charging
+
+Skill: Magic
+Action: Change Type
+Method: Charge Air Orb
+Type: Orb Charging
+
+Skill: Magic
+Action: Change Type
+Method: Low level alchemy
+Type: Alchemy
+
+Skill: Magic
+Action: Change Type
+Method: High level alchemy
+Type: Alchemy
+
+Skill: Magic
+Action: Change Type
+Method: Bones to Bananas
+Type: Transmutation
+
+Skill: Magic
+Action: Change Type
+Method: Bones to Peaches
+Type: Transmutation
+
+Skill: Magic
+Action: Change Type
+Method: Superheat item
+Type: Transmutation
+
+Skill: Magic
+Action: Change Type
+Method: Bake pie
+Type: Utility
+
+Skill: Magic
+Action: Change Type
+Method: Cure plant
+Type: Utility
+
+Skill: Magic
+Action: Change Type
+Method: Humidify
+Type: Utility
+
+Skill: Magic
+Action: Change Type
+Method: Hunter kit
+Type: Utility
+
+Skill: Magic
+Action: Change Type
+Method: Repair rune pouch
+Type: Utility
+
+Skill: Magic
+Action: Change Type
+Method: Superglass make
+Type: Utility
+
+Skill: Magic
+Action: Change Type
+Method: String jewellery
+Type: Utility
+
+Skill: Magic
+Action: Change Type
+Method: Make leather
+Type: Utility
+
+Skill: Magic
+Action: Change Type
+Method: Fertile soil
+Type: Utility
+
+Skill: Magic
+Action: Change Type
+Method: Plank make
+Type: Utility
+
+Skill: Magic
+Action: Change Type
+Method: NPC Contact
+Type: Lunar Utility
+
+Skill: Magic
+Action: Change Type
+Method: Remote farm
+Type: Lunar Utility
+
+Skill: Magic
+Action: Change Type
+Method: Magic imbue
+Type: Lunar Utility
+
+Skill: Magic
+Action: Change Type
+Method: Spellbook swap
+Type: Lunar Utility
+
+# Example:
+# Skill: Magic
+# Action: Change Type
+# Method: Enchant Sapphire bolts
+# From Type: Teleportation
+# Type: Enchantment
