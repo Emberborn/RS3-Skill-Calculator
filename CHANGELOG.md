@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.4.7] - 2026-03-02
+
+### Changed
+- Boosts panel behavior:
+  - Boost entries now scroll inside the Boosts pane
+  - Prevents boost content from overflowing past the panel bounds
+
+### Skills
+- Cooking:
+  - Cooking methods and boosts are now fully implemented
+  - Cooking content is now available for use in the live app
+
+---
+
 ## [1.4.6] - 2026-03-02
 
 ### Added

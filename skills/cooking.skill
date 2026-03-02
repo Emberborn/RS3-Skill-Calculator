@@ -1385,3 +1385,51 @@ Method: Decorated cooking urn (Urn Enhancer)
 Type: Urns
 XP: 9671.9
 
+Boost: Sous chef's outfit bonus
+Type: Outfits
+XP-Percent: 1%
+
+Boost: Sous chef's toque
+Type: Clothing
+XP-Percent: 1%
+
+Boost: Sous chef's jacket
+Type: Clothing
+XP-Percent: 1%
+
+Boost: Sous chef's trousers
+Type: Clothing
+XP-Percent: 1%
+
+Boost: Sous chef's mitts
+Type: Clothing
+XP-Percent: 1%
+
+Boost: Sous chef's shoes
+Type: Clothing
+XP-Percent: 1%
+
+Boost: Modified sous chef's toque
+Type: Clothing
+XP-Percent: 1%
+
+Boost: Cooking gauntlets (Sous mitts needed)
+Type: Clothing
+XP-Percent: 1%
+
+Boost: Brawling gloves (Cooking)
+Type: Clothing
+XP-Percent: 50%
+
+Boost: Brawling gloves (Cooking) (Infernal Puzzle Box)
+Type: Clothing
+XP-Percent: 75%
+
+Boost: Dwarven army axe
+Type: Gear
+XP-Percent: 3%
+
+Boost: Double XP Weekend
+Type: Events
+XP-Multiplier: 2
+
