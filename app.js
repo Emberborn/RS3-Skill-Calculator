@@ -1164,7 +1164,7 @@ function renderBoostTabs(skill, skillState) {
   const tabList = document.createElement("div");
   tabList.className = "tab-list";
   const content = document.createElement("div");
-  content.className = "tab-content";
+  content.className = "tab-content boosts-content";
   refs.boostsWrap.append(tabList, content);
 
   let selected = skillState.selectedBoostType;
