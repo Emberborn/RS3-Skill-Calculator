@@ -13,6 +13,10 @@
 # XP-Percent: <percent> (optional, at least one XP field required)
 # XP-Multiplier: <multiplier> (optional, at least one XP field required)
 # XP-Flat: <flat-xp> (optional, at least one XP field required)
+# Slots: <slot, slot, ...> (optional)
+# Set-Name: <name> (optional)
+# Set-Pieces: <slot, slot, ...> (optional)
+# Set-Bonus: true | false (optional)
 # Disables: <boost-name or type|boost-name, ...> (optional)
 
 Curve: standard
@@ -1387,52 +1391,64 @@ Method: Decorated cooking urn (Urn Enhancer)
 Type: Urns
 XP: 9671.9
 
-Boost: Sous chef's outfit bonus
+Boost: Sous chef's outfit
 Type: Outfits
 XP-Percent: 6%
-Disables: Sous chef's toque, Sous chef's jacket, Sous chef's trousers, Sous chef's mitts, Sous chef's shoes, Modified sous chef's toque, Cooking gauntlets (Sous mitts needed), Brawling gloves (Cooking), Brawling gloves (Cooking) (Infernal Puzzle Box)
+Set-Name: Sous chef's outfit
+Set-Pieces: head, body, legs, hands, feet
+Set-Bonus: true
+Disables: Sous chef's toque, Sous chef's jacket, Sous chef's trousers, Sous chef's mitts, Sous chef's shoes
 
 Boost: Sous chef's toque
 Type: Clothing
 XP-Percent: 1%
-Disables: Modified sous chef's toque
+Slots: head
+Set-Name: Sous chef's outfit
 
 Boost: Sous chef's jacket
 Type: Clothing
 XP-Percent: 1%
+Slots: body
+Set-Name: Sous chef's outfit
 
 Boost: Sous chef's trousers
 Type: Clothing
 XP-Percent: 1%
+Slots: legs
+Set-Name: Sous chef's outfit
 
 Boost: Sous chef's mitts
 Type: Clothing
 XP-Percent: 1%
-Disables: Cooking gauntlets (Sous mitts needed), Brawling gloves (Cooking), Brawling gloves (Cooking) (Infernal Puzzle Box
+Slots: hands
+Set-Name: Sous chef's outfit
 
 Boost: Sous chef's shoes
 Type: Clothing
 XP-Percent: 1%
+Slots: feet
+Set-Name: Sous chef's outfit
 
 Boost: Modified sous chef's toque
 Type: Clothing
 XP-Percent: 1%
-Disables: Sous chef's toque
+Slots: hands
+Set-Name: Sous chef's outfit
 
 Boost: Cooking gauntlets (Sous mitts needed)
 Type: Clothing
 XP-Percent: 1%
-Disables: Sous chef's mitts, Brawling gloves (Cooking), Brawling gloves (Cooking) (Infernal Puzzle Box
+Slots: hands
 
 Boost: Brawling gloves (Cooking)
 Type: Clothing
 XP-Percent: 50%
-Disables: Sous chef's mitts, Cooking gauntlets (Sous mitts needed), Brawling gloves (Cooking) (Infernal Puzzle Box
+Slots: hands
 
 Boost: Brawling gloves (Cooking) (Infernal Puzzle Box)
 Type: Clothing
 XP-Percent: 75%
-Disables: Sous chef's mitts, Cooking gauntlets (Sous mitts needed), Brawling gloves (Cooking)
+Slots: hands
 
 Boost: Dwarven army axe
 Type: Gear

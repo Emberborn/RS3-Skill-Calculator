@@ -13,6 +13,10 @@
 # XP-Percent: <percent> (optional, at least one XP field required)
 # XP-Multiplier: <multiplier> (optional, at least one XP field required)
 # XP-Flat: <flat-xp> (optional, at least one XP field required)
+# Slots: <slot, slot, ...> (optional)
+# Set-Name: <name> (optional)
+# Set-Pieces: <slot, slot, ...> (optional)
+# Set-Bonus: true | false (optional)
 # Disables: <boost-name or type|boost-name, ...> (optional)
 
 Curve: standard

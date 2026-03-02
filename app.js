@@ -755,7 +755,18 @@ function parseSkillFile(fileName, text) {
 
   let block = "";
   let method = { name: "", type: "Default", level: 1, xp: null };
-  let boost = { name: "", type: "General", xpPercent: null, xpMultiplier: null, xpFlat: null, disables: [] };
+  let boost = {
+    name: "",
+    type: "General",
+    xpPercent: null,
+    xpMultiplier: null,
+    xpFlat: null,
+    slots: [],
+    setName: "",
+    setPieces: [],
+    setBonus: false,
+    disables: [],
+  };
 
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
@@ -787,14 +798,36 @@ function parseSkillFile(fileName, text) {
       if (block === "boost") finalizeBoost(boosts, boost, issues, lineNo);
       block = "method";
       method = { name: line.slice(7).trim(), type: "Default", level: 1, xp: null };
-      boost = { name: "", type: "General", xpPercent: null, xpMultiplier: null, xpFlat: null, disables: [] };
+      boost = {
+        name: "",
+        type: "General",
+        xpPercent: null,
+        xpMultiplier: null,
+        xpFlat: null,
+        slots: [],
+        setName: "",
+        setPieces: [],
+        setBonus: false,
+        disables: [],
+      };
       continue;
     }
     if (lower.startsWith("boost:")) {
       if (block === "method") finalizeMethod(methods, method, issues, lineNo);
       finalizeBoost(boosts, boost, issues, lineNo);
       block = "boost";
-      boost = { name: line.slice(6).trim(), type: "General", xpPercent: null, xpMultiplier: null, xpFlat: null, disables: [] };
+      boost = {
+        name: line.slice(6).trim(),
+        type: "General",
+        xpPercent: null,
+        xpMultiplier: null,
+        xpFlat: null,
+        slots: [],
+        setName: "",
+        setPieces: [],
+        setBonus: false,
+        disables: [],
+      };
       method = { name: "", type: "Default", level: 1, xp: null };
       continue;
     }
@@ -853,6 +886,41 @@ function parseSkillFile(fileName, text) {
       boost.disables = parseBoostDisableList(line.slice(9));
       continue;
     }
+    if (lower.startsWith("slots:")) {
+      if (block !== "boost") {
+        issues.push({ line: lineNo, message: "Slots is outside a Boost block." });
+        continue;
+      }
+      boost.slots = parseBoostDisableList(line.slice(6));
+      continue;
+    }
+    if (lower.startsWith("set-name:")) {
+      if (block !== "boost") {
+        issues.push({ line: lineNo, message: "Set-Name is outside a Boost block." });
+        continue;
+      }
+      boost.setName = line.slice(9).trim();
+      continue;
+    }
+    if (lower.startsWith("set-pieces:")) {
+      if (block !== "boost") {
+        issues.push({ line: lineNo, message: "Set-Pieces is outside a Boost block." });
+        continue;
+      }
+      boost.setPieces = parseBoostDisableList(line.slice(11));
+      continue;
+    }
+    if (lower.startsWith("set-bonus:")) {
+      if (block !== "boost") {
+        issues.push({ line: lineNo, message: "Set-Bonus is outside a Boost block." });
+        continue;
+      }
+      const v = line.slice(10).trim().toLowerCase();
+      if (["true", "1", "yes", "on"].includes(v)) boost.setBonus = true;
+      else if (["false", "0", "no", "off"].includes(v)) boost.setBonus = false;
+      else issues.push({ line: lineNo, message: "Invalid Set-Bonus value. Use true/false." });
+      continue;
+    }
     if (lower.startsWith("xp:")) {
       if (block !== "method") {
         issues.push({ line: lineNo, message: "XP is outside a Method block." });
@@ -905,6 +973,10 @@ function finalizeBoost(boosts, b, issues, lineNo) {
     xpPercent: numOrNull(b.xpPercent),
     xpMultiplier: numOrNull(b.xpMultiplier),
     xpFlat: numOrNull(b.xpFlat),
+    slots: Array.isArray(b.slots) ? b.slots : [],
+    setName: String(b.setName || "").trim(),
+    setPieces: Array.isArray(b.setPieces) ? b.setPieces : [],
+    setBonus: !!b.setBonus,
     disables: Array.isArray(b.disables) ? b.disables : [],
   });
 }
@@ -1174,6 +1246,8 @@ function renderDetail() {
 }
 
 function renderBoostTabs(skill, skillState) {
+  const prevTabScroll = refs.boostsWrap.querySelector(".tab-list")?.scrollTop ?? 0;
+  const prevListScroll = refs.boostsWrap.querySelector(".boosts-content")?.scrollTop ?? 0;
   refs.boostsWrap.innerHTML = "";
   refs.boostsWrap.classList.remove("single-pane");
   if (!skill.boosts.length) {
@@ -1191,6 +1265,7 @@ function renderBoostTabs(skill, skillState) {
   const content = document.createElement("div");
   content.className = "tab-content boosts-content";
   refs.boostsWrap.append(tabList, content);
+  tabList.scrollTop = prevTabScroll;
 
   let selected = skillState.selectedBoostType;
   if (!types.includes(selected)) selected = types[0];
@@ -1212,16 +1287,10 @@ function renderBoostTabs(skill, skillState) {
   const wrap = document.createElement("div");
   wrap.className = "check-list";
   for (const boost of skill.boosts.filter((b) => b.type === selected)) {
-    const id = boostId(boost);
     const label = document.createElement("label");
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
-    checkbox.checked = skillState.enabledBoostIds.includes(id);
-    const disabler = activeBoostDisablerFor(skill, skillState, boost);
-    if (disabler && !checkbox.checked) {
-      checkbox.disabled = true;
-      label.title = `Disabled by ${disabler.name}`;
-    }
+    checkbox.checked = skillState.enabledBoostIds.includes(boostId(boost));
     checkbox.addEventListener("change", () => {
       applyBoostSelection(skill, skillState, boost, checkbox.checked);
       persistProfile();
@@ -1233,6 +1302,7 @@ function renderBoostTabs(skill, skillState) {
     wrap.appendChild(label);
   }
   content.appendChild(wrap);
+  content.scrollTop = prevListScroll;
 }
 
 function renderMethodTabs(skill, skillState) {
@@ -2094,6 +2164,25 @@ function boostMatchesDisableToken(boost, token) {
   return t === byName || t === byFull;
 }
 
+function normalizeBoostSlotToken(token) {
+  return String(token || "").trim().toLowerCase();
+}
+
+function boostSlots(boost) {
+  const direct = Array.isArray(boost?.slots) ? boost.slots : [];
+  if (direct.length) return direct.map(normalizeBoostSlotToken).filter(Boolean);
+  if (boost?.setBonus && Array.isArray(boost?.setPieces)) {
+    return boost.setPieces.map(normalizeBoostSlotToken).filter(Boolean);
+  }
+  return [];
+}
+
+function boostsShareSlot(a, b) {
+  const aSlots = new Set(boostSlots(a));
+  if (!aSlots.size) return false;
+  return boostSlots(b).some((slot) => aSlots.has(slot));
+}
+
 function disabledBoostIdsForBoost(skill, boost) {
   const tokens = Array.isArray(boost.disables) ? boost.disables : [];
   if (!tokens.length) return [];
@@ -2107,30 +2196,93 @@ function disabledBoostIdsForBoost(skill, boost) {
   return ids;
 }
 
-function activeBoostDisablerFor(skill, skillState, boost) {
-  const id = boostId(boost);
-  const enabled = new Set(skillState.enabledBoostIds || []);
-  for (const candidate of skill.boosts) {
-    const candidateId = boostId(candidate);
-    if (!enabled.has(candidateId) || candidateId === id) continue;
-    const disabledIds = disabledBoostIdsForBoost(skill, candidate);
-    if (disabledIds.includes(id)) return candidate;
-  }
-  return null;
-}
-
 function applyBoostSelection(skill, skillState, boost, checked) {
   const id = boostId(boost);
+  const selectedSlots = boostSlots(boost);
   const enabled = new Set(skillState.enabledBoostIds || []);
   if (checked) {
     enabled.add(id);
+    const removedSetBonuses = [];
+
+    for (const other of skill.boosts) {
+      const otherId = boostId(other);
+      if (otherId === id || !enabled.has(otherId)) continue;
+      if (boostsShareSlot(boost, other)) {
+        enabled.delete(otherId);
+        if (other.setBonus) removedSetBonuses.push(other);
+      }
+    }
+
     for (const blockedId of disabledBoostIdsForBoost(skill, boost)) {
       enabled.delete(blockedId);
     }
+
+    for (const setBonusBoost of removedSetBonuses) {
+      const setName = String(setBonusBoost.setName || "").trim().toLowerCase();
+      if (!setName) continue;
+      for (const candidate of skill.boosts) {
+        if (candidate.setBonus) continue;
+        if (String(candidate.setName || "").trim().toLowerCase() !== setName) continue;
+        const candidateId = boostId(candidate);
+        if (candidateId === id) continue;
+        if (disabledBoostIdsForBoost(skill, boost).includes(candidateId)) continue;
+        const candidateSlots = boostSlots(candidate);
+        if (candidateSlots.some((slot) => selectedSlots.includes(slot))) continue;
+        if (Array.from(enabled).some((enabledId) => {
+          const enabledBoost = skill.boosts.find((b) => boostId(b) === enabledId);
+          return !!enabledBoost && boostsShareSlot(candidate, enabledBoost);
+        })) {
+          continue;
+        }
+        enabled.add(candidateId);
+      }
+    }
+    autoPromoteCompletedSetBonuses(skill, enabled);
   } else {
     enabled.delete(id);
   }
   skillState.enabledBoostIds = [...enabled];
+}
+
+function autoPromoteCompletedSetBonuses(skill, enabledSet) {
+  const bySetName = new Map();
+  for (const boost of skill.boosts) {
+    const setName = String(boost.setName || "").trim();
+    if (!setName) continue;
+    const key = setName.toLowerCase();
+    if (!bySetName.has(key)) bySetName.set(key, []);
+    bySetName.get(key).push(boost);
+  }
+
+  for (const boosts of bySetName.values()) {
+    const setBonuses = boosts.filter((b) => !!b.setBonus);
+    if (!setBonuses.length) continue;
+    for (const setBonusBoost of setBonuses) {
+      const required = (Array.isArray(setBonusBoost.setPieces) ? setBonusBoost.setPieces : [])
+        .map((x) => normalizeBoostSlotToken(x))
+        .filter(Boolean);
+      if (!required.length) continue;
+
+      const pieces = boosts.filter((b) => !b.setBonus);
+      const activePieces = pieces.filter((p) => enabledSet.has(boostId(p)));
+      const activeSlots = new Set();
+      for (const piece of activePieces) {
+        for (const slot of boostSlots(piece)) activeSlots.add(slot);
+      }
+      const complete = required.every((slot) => activeSlots.has(slot));
+      if (!complete) continue;
+
+      const setBonusId = boostId(setBonusBoost);
+      const wasEnabled = enabledSet.has(setBonusId);
+      enabledSet.add(setBonusId);
+      for (const piece of pieces) {
+        enabledSet.delete(boostId(piece));
+      }
+      if (!wasEnabled) {
+        showBottomNotice(`${setBonusBoost.name} activated automatically.`);
+      }
+    }
+  }
 }
 
 function distinctTypes(items, preferredFirst) {

@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [1.4.8] - 2026-03-02
+
+### Boosts
+- Added `XP-Flat` support:
+  - Boosts can now add a flat XP amount per action (in addition to percent/multiplier)
+- Added boost conflict schema for gear logic:
+  - `Slots`
+  - `Set-Name`
+  - `Set-Pieces`
+  - `Set-Bonus`
+- Added slot-based auto-swap behavior:
+  - Enabling a conflicting slot boost now unticks competing boosts instead of disabling them
+- Added set fallback behavior:
+  - If a full set bonus is active and a conflicting piece is enabled, set bonus is removed and compatible set pieces are restored automatically
+- Added automatic set promotion:
+  - When all required set slots are covered, set bonus auto-activates and piece boosts are unticked
+  - Includes a bottom notification when auto-activation occurs
+- Improved boost list UX:
+  - Boost panel now preserves scroll position after toggles
+
+---
+
 ## [1.4.7] - 2026-03-02
 
 ### Changed
